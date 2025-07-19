@@ -1,18 +1,18 @@
 from datetime import datetime, timedelta
-from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from sqlalchemy import CheckConstraint, Index
 import enum
 import uuid
 import math
 
-db = SQLAlchemy()
+from eventapp import db
 
 # User roles enum
 class UserRole(enum.Enum):
     admin = 'admin'
     organizer = 'organizer'
-    attendee = 'attendee'
+    staff='staff'
+    customer='customer'
 
 # Customer groups enum
 class CustomerGroup(enum.Enum):
@@ -28,7 +28,7 @@ class User(db.Model):
     username = db.Column(db.String(255), unique=True, index=True, nullable=False)
     email = db.Column(db.String(255), unique=True, index=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.Enum(UserRole), default=UserRole.attendee, nullable=False)
+    role = db.Column(db.Enum(UserRole), default=UserRole.customer, nullable=False)
     phone = db.Column(db.String(15), nullable=True)
     avatar_url = db.Column(db.String(512), nullable=True)
 
@@ -240,10 +240,8 @@ class Ticket(db.Model):
         Index('ix_ticket_user_event', 'user_id', 'event_id'),
         Index('ix_ticket_type', 'ticket_type_id'),
         Index('ix_ticket_qr_code', 'qr_code_url'),
-        # Ensure ticket belongs to same event as ticket_type
-        CheckConstraint('''
-            event_id = (SELECT event_id FROM ticket_types WHERE id = ticket_type_id)
-        ''', name='ticket_event_matches_ticket_type_event'),
+        # Note: MySQL doesn't support subqueries in CHECK constraints
+        # Data integrity will be enforced at application level
     )
 
     def __repr__(self):
