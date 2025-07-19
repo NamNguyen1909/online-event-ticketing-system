@@ -55,15 +55,17 @@ class User(db.Model):
     def avatar_url(self):
         """Get avatar URL with default transformations"""
         if self.avatar:
-            return self.avatar.url(width=200, height=200, crop="fill", gravity="face")
+            return self.avatar.build_url(width=200, height=200, crop="fill", gravity="face")
         return None
 
     def upload_avatar(self, file):
-        """Upload avatar file"""
-        if not self.avatar:
-            self.avatar = CloudinaryImageWrapper()
-        return self.avatar.upload(file, folder='avatars', public_id=f"user_{self.id}_{uuid.uuid4().hex[:8]}")
-
+        """Upload avatar file and set the field"""
+        wrapper = CloudinaryImageWrapper()
+        result = wrapper.upload(file, folder='avatars', public_id=f"user_{self.id}_{uuid.uuid4().hex[:8]}")
+        if result:
+            self.avatar = wrapper.public_id  # Lưu public_id vào DB
+        return result
+    
     def get_customer_group(self):
         """Determine user group based on total_spent and account age"""
         now = datetime.utcnow()
@@ -89,12 +91,17 @@ class User(db.Model):
     
 
 
-## Tạo user mới
+# # Tạo user và upload avatar
 # user = User(username='test', email='test@example.com')
-# user.upload_avatar(file_data)
+# db.session.add(user)
+# db.session.flush()  # Để có ID
 
-## Lấy URL
-# avatar_url = user.avatar_url  # Tự động generate URL với transformation
+# result = user.upload_avatar(file_data)
+# if result:
+#     db.session.commit()
+#     avatar_url = user.avatar_url  # Sẽ hoạt động đúng
+
+# # Tương tự cho Event và Ticket
 
 
 
@@ -150,22 +157,23 @@ class Event(db.Model):
     def poster_url(self):
         """Get poster URL"""
         if self.poster:
-            return self.poster.url(width=800, height=600, crop="fill")
+            return self.poster.build_url(width=800, height=600, crop="fill")
         return None
 
     @property
     def poster_thumbnail_url(self):
         """Get poster thumbnail URL"""
         if self.poster:
-            return self.poster.url(width=300, height=200, crop="fill")
+            return self.poster.build_url(width=300, height=200, crop="fill")
         return None
 
     def upload_poster(self, file):
-        """Upload poster file"""
-        if not self.poster:
-            self.poster = CloudinaryImageWrapper()
-        return self.poster.upload(file, folder='event_posters', public_id=f"event_{self.id}_{uuid.uuid4().hex[:8]}")
-
+        """Upload poster file and set the field"""
+        wrapper = CloudinaryImageWrapper()
+        result = wrapper.upload(file, folder='event_posters', public_id=f"event_{self.id}_{uuid.uuid4().hex[:8]}")
+        if result:
+            self.poster = wrapper.public_id  # Lưu public_id vào DB
+        return result
 
     @property
     def total_tickets(self):
@@ -302,7 +310,7 @@ class Ticket(db.Model):
     def qr_code_url(self):
         """Get QR code URL"""
         if self.qr_code:
-            return self.qr_code.url(width=300, height=300, crop="fit")
+            return self.qr_code.build_url(width=300, height=300, crop="fit")
         return None
 
     def generate_qr_code(self, qr_code_data=None):
@@ -324,18 +332,18 @@ class Ticket(db.Model):
             qr_image.save(img_buffer, format='PNG')
             img_buffer.seek(0)
 
-            if not self.qr_code:
-                self.qr_code = CloudinaryImageWrapper()
-            
-            return self.qr_code.upload(
+            wrapper = CloudinaryImageWrapper()
+            result = wrapper.upload(
                 img_buffer.getvalue(),
                 folder='qr_codes',
                 public_id=f"qr_ticket_{self.id}_{uuid.uuid4().hex[:8]}"
             )
+            if result:
+                self.qr_code = wrapper.public_id  # Lưu public_id vào DB
+            return result
         except Exception as e:
             print(f"Error generating QR code: {e}")
             return None
-
 
     def mark_as_paid(self, paid_at):
         self.is_paid = True
