@@ -6,6 +6,8 @@ import uuid
 import math
 
 from eventapp import db
+from eventapp.fields import CloudinaryField, CloudinaryImageWrapper
+# Define custom Cloudinary field for image URLs
 
 # User roles enum
 class UserRole(enum.Enum):
@@ -30,11 +32,14 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.Enum(UserRole), default=UserRole.customer, nullable=False)
     phone = db.Column(db.String(15), nullable=True)
-    avatar_url = db.Column(db.String(512), nullable=True)
+    
+    # Sử dụng custom CloudinaryField
+    avatar = db.Column(CloudinaryField(folder='avatars'), nullable=True)
 
     total_spent = db.Column(db.Numeric(12, 2), default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 
     # Relationships
     organized_events = relationship('Event', back_populates='organizer', lazy='dynamic')
@@ -46,6 +51,21 @@ class User(db.Model):
     def __repr__(self):
         return f'<User {self.username}>'
 
+    @property
+    def avatar_url(self):
+        """Get avatar URL with default transformations"""
+        if self.avatar:
+            return self.avatar.build_url(width=200, height=200, crop="fill", gravity="face")
+        return None
+
+    def upload_avatar(self, file):
+        """Upload avatar file and set the field"""
+        wrapper = CloudinaryImageWrapper()
+        result = wrapper.upload(file, folder='avatars', public_id=f"user_{self.id}_{uuid.uuid4().hex[:8]}")
+        if result:
+            self.avatar = wrapper.public_id  # Lưu public_id vào DB
+        return result
+    
     def get_customer_group(self):
         """Determine user group based on total_spent and account age"""
         now = datetime.utcnow()
@@ -68,6 +88,23 @@ class User(db.Model):
         if limit:
             query = query.limit(limit)
         return query
+    
+
+
+# # Tạo user và upload avatar
+# user = User(username='test', email='test@example.com')
+# db.session.add(user)
+# db.session.flush()  # Để có ID
+
+# result = user.upload_avatar(file_data)
+# if result:
+#     db.session.commit()
+#     avatar_url = user.avatar_url  # Sẽ hoạt động đúng
+
+# # Tương tự cho Event và Ticket
+
+
+
 
 class EventCategory(enum.Enum):
     music = 'music'
@@ -93,15 +130,12 @@ class Event(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     location = db.Column(db.String(500), nullable=False)
 
-    # Remove single ticket fields - will be replaced by TicketType model
-    # total_tickets = db.Column(db.Integer, nullable=False)
-    # ticket_price = db.Column(db.Numeric(9, 2), nullable=False)
-    # sold_tickets = db.Column(db.Integer, default=0, nullable=False)
-
-    poster_url = db.Column(db.String(512), nullable=True)
+    # Sử dụng custom CloudinaryField
+    poster = db.Column(CloudinaryField(folder='event_posters'), nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 
     # Relationships
     organizer = relationship('User', back_populates='organized_events')
@@ -118,6 +152,28 @@ class Event(db.Model):
 
     def __repr__(self):
         return f'<Event {self.title}>'
+    
+    @property
+    def poster_url(self):
+        """Get poster URL"""
+        if self.poster:
+            return self.poster.build_url(width=800, height=600, crop="fill")
+        return None
+
+    @property
+    def poster_thumbnail_url(self):
+        """Get poster thumbnail URL"""
+        if self.poster:
+            return self.poster.build_url(width=300, height=200, crop="fill")
+        return None
+
+    def upload_poster(self, file):
+        """Upload poster file and set the field"""
+        wrapper = CloudinaryImageWrapper()
+        result = wrapper.upload(file, folder='event_posters', public_id=f"event_{self.id}_{uuid.uuid4().hex[:8]}")
+        if result:
+            self.poster = wrapper.public_id  # Lưu public_id vào DB
+        return result
 
     @property
     def total_tickets(self):
@@ -219,7 +275,10 @@ class Ticket(db.Model):
     event_id = db.Column(db.Integer, db.ForeignKey('events.id'), nullable=False)
     ticket_type_id = db.Column(db.Integer, db.ForeignKey('ticket_types.id'), nullable=False)
     uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
-    qr_code_url = db.Column(db.String(512), nullable=True)
+    
+    # Sử dụng custom CloudinaryField
+    qr_code = db.Column(CloudinaryField(folder='qr_codes'), nullable=True)
+
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_paid = db.Column(db.Boolean, default=False, nullable=False)
@@ -239,13 +298,52 @@ class Ticket(db.Model):
     __table_args__ = (
         Index('ix_ticket_user_event', 'user_id', 'event_id'),
         Index('ix_ticket_type', 'ticket_type_id'),
-        Index('ix_ticket_qr_code', 'qr_code_url'),
+        Index('ix_ticket_qr_code', 'qr_code'),
         # Note: MySQL doesn't support subqueries in CHECK constraints
         # Data integrity will be enforced at application level
     )
 
     def __repr__(self):
         return f'<Ticket user={self.user_id} event={self.event_id}>'
+    
+    @property
+    def qr_code_url(self):
+        """Get QR code URL"""
+        if self.qr_code:
+            return self.qr_code.build_url(width=300, height=300, crop="fit")
+        return None
+
+    def generate_qr_code(self, qr_code_data=None):
+        """Generate and upload QR code"""
+        try:
+            import qrcode
+            from io import BytesIO
+            
+            if not qr_code_data:
+                qr_code_data = self.uuid
+            
+            # Generate QR code
+            qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
+            qr.add_data(qr_code_data)
+            qr.make(fit=True)
+
+            qr_image = qr.make_image(fill_color="black", back_color="white")
+            img_buffer = BytesIO()
+            qr_image.save(img_buffer, format='PNG')
+            img_buffer.seek(0)
+
+            wrapper = CloudinaryImageWrapper()
+            result = wrapper.upload(
+                img_buffer.getvalue(),
+                folder='qr_codes',
+                public_id=f"qr_ticket_{self.id}_{uuid.uuid4().hex[:8]}"
+            )
+            if result:
+                self.qr_code = wrapper.public_id  # Lưu public_id vào DB
+            return result
+        except Exception as e:
+            print(f"Error generating QR code: {e}")
+            return None
 
     def mark_as_paid(self, paid_at):
         self.is_paid = True
