@@ -6,8 +6,10 @@ import uuid
 import math
 
 from eventapp import db
-from eventapp.fields import CloudinaryField, CloudinaryImageWrapper
-# Define custom Cloudinary field for image URLs
+# Import cloudinary trực tiếp
+import cloudinary
+import cloudinary.uploader
+from cloudinary import CloudinaryImage
 
 # User roles enum
 class UserRole(enum.Enum):
@@ -33,13 +35,13 @@ class User(db.Model):
     role = db.Column(db.Enum(UserRole), default=UserRole.customer, nullable=False)
     phone = db.Column(db.String(15), nullable=True)
     
-    # Sử dụng custom CloudinaryField
-    avatar = db.Column(CloudinaryField(folder='avatars'), nullable=True)
+    # Chỉ lưu public_id dưới dạng string
+    avatar = db.Column(db.String(255), nullable=True)
 
     total_spent = db.Column(db.Numeric(12, 2), default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
 
     # Relationships
     organized_events = relationship('Event', back_populates='organizer', lazy='dynamic')
@@ -55,16 +57,53 @@ class User(db.Model):
     def avatar_url(self):
         """Get avatar URL with default transformations"""
         if self.avatar:
-            return self.avatar.build_url(width=200, height=200, crop="fill", gravity="face")
+            return CloudinaryImage(self.avatar).build_url(
+                width=200, height=200, crop="fill", gravity="face"
+            )
+        return None
+
+    @property
+    def avatar_thumbnail_url(self):
+        """Get avatar thumbnail URL"""
+        if self.avatar:
+            return CloudinaryImage(self.avatar).build_url(
+                width=100, height=100, crop="fill", gravity="face"
+            )
         return None
 
     def upload_avatar(self, file):
-        """Upload avatar file and set the field"""
-        wrapper = CloudinaryImageWrapper()
-        result = wrapper.upload(file, folder='avatars', public_id=f"user_{self.id}_{uuid.uuid4().hex[:8]}")
-        if result:
-            self.avatar = wrapper.public_id  # Lưu public_id vào DB
-        return result
+        """Upload avatar file to Cloudinary"""
+        try:
+            # Delete old avatar if exists
+            if self.avatar:
+                cloudinary.uploader.destroy(self.avatar)
+            
+            # Upload new avatar
+            result = cloudinary.uploader.upload(
+                file,
+                folder='avatars',
+                public_id=f"user_{self.id}_{uuid.uuid4().hex[:8]}",
+                overwrite=True,
+                resource_type='image'
+            )
+            
+            # Lưu public_id vào database
+            self.avatar = result['public_id']
+            return result
+        except Exception as e:
+            print(f"Error uploading avatar: {e}")
+            return None
+
+    def delete_avatar(self):
+        """Delete avatar from Cloudinary"""
+        if self.avatar:
+            try:
+                result = cloudinary.uploader.destroy(self.avatar)
+                self.avatar = None
+                return result
+            except Exception as e:
+                print(f"Error deleting avatar: {e}")
+                return None
     
     def get_customer_group(self):
         """Determine user group based on total_spent and account age"""
@@ -88,23 +127,6 @@ class User(db.Model):
         if limit:
             query = query.limit(limit)
         return query
-    
-
-
-# # Tạo user và upload avatar
-# user = User(username='test', email='test@example.com')
-# db.session.add(user)
-# db.session.flush()  # Để có ID
-
-# result = user.upload_avatar(file_data)
-# if result:
-#     db.session.commit()
-#     avatar_url = user.avatar_url  # Sẽ hoạt động đúng
-
-# # Tương tự cho Event và Ticket
-
-
-
 
 class EventCategory(enum.Enum):
     music = 'music'
@@ -130,12 +152,11 @@ class Event(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     location = db.Column(db.String(500), nullable=False)
 
-    # Sử dụng custom CloudinaryField
-    poster = db.Column(CloudinaryField(folder='event_posters'), nullable=True)
+    # Chỉ lưu public_id dưới dạng string
+    poster = db.Column(db.String(255), nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
 
     # Relationships
     organizer = relationship('User', back_populates='organized_events')
@@ -157,24 +178,55 @@ class Event(db.Model):
     def poster_url(self):
         """Get poster URL"""
         if self.poster:
-            return self.poster.build_url(width=800, height=600, crop="fill")
+            return CloudinaryImage(self.poster).build_url(
+                width=800, height=600, crop="fill"
+            )
         return None
 
     @property
     def poster_thumbnail_url(self):
         """Get poster thumbnail URL"""
         if self.poster:
-            return self.poster.build_url(width=300, height=200, crop="fill")
+            return CloudinaryImage(self.poster).build_url(
+                width=300, height=200, crop="fill"
+            )
         return None
 
     def upload_poster(self, file):
-        """Upload poster file and set the field"""
-        wrapper = CloudinaryImageWrapper()
-        result = wrapper.upload(file, folder='event_posters', public_id=f"event_{self.id}_{uuid.uuid4().hex[:8]}")
-        if result:
-            self.poster = wrapper.public_id  # Lưu public_id vào DB
-        return result
+        """Upload poster file to Cloudinary"""
+        try:
+            # Delete old poster if exists
+            if self.poster:
+                cloudinary.uploader.destroy(self.poster)
+            
+            # Upload new poster
+            result = cloudinary.uploader.upload(
+                file,
+                folder='event_posters',
+                public_id=f"event_{self.id}_{uuid.uuid4().hex[:8]}",
+                overwrite=True,
+                resource_type='image'
+            )
+            
+            # Lưu public_id vào database
+            self.poster = result['public_id']
+            return result
+        except Exception as e:
+            print(f"Error uploading poster: {e}")
+            return None
 
+    def delete_poster(self):
+        """Delete poster from Cloudinary"""
+        if self.poster:
+            try:
+                result = cloudinary.uploader.destroy(self.poster)
+                self.poster = None
+                return result
+            except Exception as e:
+                print(f"Error deleting poster: {e}")
+                return None
+
+    # ...existing properties and methods remain the same...
     @property
     def total_tickets(self):
         """Calculate total tickets from all ticket types"""
@@ -276,9 +328,8 @@ class Ticket(db.Model):
     ticket_type_id = db.Column(db.Integer, db.ForeignKey('ticket_types.id'), nullable=False)
     uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     
-    # Sử dụng custom CloudinaryField
-    qr_code = db.Column(CloudinaryField(folder='qr_codes'), nullable=True)
-
+    # Chỉ lưu public_id dưới dạng string
+    qr_code = db.Column(db.String(255), nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_paid = db.Column(db.Boolean, default=False, nullable=False)
@@ -310,11 +361,13 @@ class Ticket(db.Model):
     def qr_code_url(self):
         """Get QR code URL"""
         if self.qr_code:
-            return self.qr_code.build_url(width=300, height=300, crop="fit")
+            return CloudinaryImage(self.qr_code).build_url(
+                width=300, height=300, crop="fit"
+            )
         return None
 
     def generate_qr_code(self, qr_code_data=None):
-        """Generate and upload QR code"""
+        """Generate and upload QR code to Cloudinary"""
         try:
             import qrcode
             from io import BytesIO
@@ -323,7 +376,12 @@ class Ticket(db.Model):
                 qr_code_data = self.uuid
             
             # Generate QR code
-            qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
+            qr = qrcode.QRCode(
+                version=1, 
+                error_correction=qrcode.constants.ERROR_CORRECT_L, 
+                box_size=10, 
+                border=4
+            )
             qr.add_data(qr_code_data)
             qr.make(fit=True)
 
@@ -332,18 +390,36 @@ class Ticket(db.Model):
             qr_image.save(img_buffer, format='PNG')
             img_buffer.seek(0)
 
-            wrapper = CloudinaryImageWrapper()
-            result = wrapper.upload(
+            # Delete old QR code if exists
+            if self.qr_code:
+                cloudinary.uploader.destroy(self.qr_code)
+
+            # Upload to Cloudinary
+            result = cloudinary.uploader.upload(
                 img_buffer.getvalue(),
                 folder='qr_codes',
-                public_id=f"qr_ticket_{self.id}_{uuid.uuid4().hex[:8]}"
+                public_id=f"qr_ticket_{self.id}_{uuid.uuid4().hex[:8]}",
+                overwrite=True,
+                resource_type='image'
             )
-            if result:
-                self.qr_code = wrapper.public_id  # Lưu public_id vào DB
+            
+            # Lưu public_id vào database
+            self.qr_code = result['public_id']
             return result
         except Exception as e:
             print(f"Error generating QR code: {e}")
             return None
+
+    def delete_qr_code(self):
+        """Delete QR code from Cloudinary"""
+        if self.qr_code:
+            try:
+                result = cloudinary.uploader.destroy(self.qr_code)
+                self.qr_code = None
+                return result
+            except Exception as e:
+                print(f"Error deleting QR code: {e}")
+                return None
 
     def mark_as_paid(self, paid_at):
         self.is_paid = True
@@ -668,3 +744,4 @@ class Translation(db.Model):
 
     def __repr__(self):
         return f'<Translation {self.key}:{self.language}>'
+
