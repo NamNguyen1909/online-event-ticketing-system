@@ -1,0 +1,31 @@
+{% extends 'layout/base.html' %}
+
+{% block title %}Sự Kiện - EventHub{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="my-4">Tất Cả Sự Kiện</h1>
+    <div class="row">
+        {% for event in events %}
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                {% if event.poster_url %}
+                <img src="{{ event.poster_url }}" class="card-img-top" alt="{{ event.title }}" style="height: 200px; object-fit: cover;">
+                {% else %}
+                <img src="https://via.placeholder.com/300x200" class="card-img-top" alt="No poster" style="height: 200px; object-fit: cover;">
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ event.title }}</h5>
+                    <p><strong>{{ event.category.value|capitalize }}</strong> - {{ event.price|default('Free') }}</p>
+                    <p>{{ event.start_time.strftime('%d/%m/%Y') }}<br>{{ event.location }}</p>
+                    <p>{{ event.available_tickets }}/{{ event.total_tickets }} vé</p>
+                    <a href="{{ url_for('event_detail', event_id=event.id) }}" class="btn btn-primary">Đặt Vé</a>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-center">Không có sự kiện nào.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -50,6 +50,10 @@ class User(db.Model):
     reviews = relationship('Review', back_populates='user', lazy='dynamic')
     user_notifications = relationship('UserNotification', back_populates='user', lazy='dynamic')
 
+    def get_id(self):
+        """Phương thức bắt buộc bởi Flask-Login để lấy ID người dùng"""
+        return str(self.id)
+
     def __repr__(self):
         return f'<User {self.username}>'
 

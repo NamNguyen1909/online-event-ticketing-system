@@ -1,179 +1,91 @@
-<!-- Header Navigation -->
-<header class="header-section">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top shadow">
-        <div class="container">
-            <!-- Brand Logo -->
-            <a class="navbar-brand fw-bold fs-3" href="{{ url_for('home') }}">
-                <i class="fas fa-ticket-alt text-warning me-2"></i>
-                <span class="text-white">Event</span><span class="text-warning">Hub</span>
-            </a>
-
-            <!-- Mobile Menu Toggle -->
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
-                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-
-            <!-- Navigation Menu -->
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <!-- Main Navigation -->
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="{{ url_for('home') }}">
-                            <i class="fas fa-home me-1"></i>Trang Chủ
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#events">
-                            <i class="fas fa-calendar-alt me-1"></i>Sự Kiện
-                        </a>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="categoriesDropdown" role="button" 
-                           data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-list me-1"></i>Danh Mục
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#music"><i class="fas fa-music me-2"></i>Âm Nhạc</a></li>
-                            <li><a class="dropdown-item" href="#sports"><i class="fas fa-futbol me-2"></i>Thể Thao</a></li>
-                            <li><a class="dropdown-item" href="#seminar"><i class="fas fa-chalkboard-teacher me-2"></i>Hội Thảo</a></li>
-                            <li><a class="dropdown-item" href="#conference"><i class="fas fa-users me-2"></i>Hội Nghị</a></li>
-                            <li><a class="dropdown-item" href="#festival"><i class="fas fa-star me-2"></i>Lễ Hội</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#all"><i class="fas fa-th me-2"></i>Tất Cả</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#trending">
-                            <i class="fas fa-fire text-danger me-1"></i>Trending
-                        </a>
-                    </li>
-                </ul>
-
-                <!-- Search Bar -->
-                <form class="d-flex me-3" role="search">
-                    <div class="input-group">
-                        <input class="form-control" type="search" placeholder="Tìm kiếm sự kiện..." aria-label="Search">
-                        <button class="btn btn-outline-light" type="submit">
-                            <i class="fas fa-search"></i>
-                        </button>
-                    </div>
-                </form>
-
-                <!-- User Actions -->
-                <ul class="navbar-nav">
-                    <!-- Cart/Tickets -->
-                    <li class="nav-item">
-                        <a class="nav-link position-relative" href="#cart">
-                            <i class="fas fa-shopping-cart"></i>
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                                3
-                                <span class="visually-hidden">unread messages</span>
-                            </span>
-                        </a>
-                    </li>
-
-                    <!-- Notifications -->
-                    <li class="nav-item dropdown">
-                        <a class="nav-link position-relative" href="#" id="notificationsDropdown" role="button" 
-                           data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-bell"></i>
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning">
-                                2
-                                <span class="visually-hidden">unread notifications</span>
-                            </span>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end notification-dropdown">
-                            <li class="dropdown-header">
-                                <strong>Thông Báo</strong>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item" href="#">
-                                    <div class="d-flex">
-                                        <div class="flex-shrink-0">
-                                            <i class="fas fa-ticket-alt text-primary"></i>
-                                        </div>
-                                        <div class="flex-grow-1 ms-3">
-                                            <div class="fw-bold">Vé đã được xác nhận</div>
-                                            <div class="text-muted small">Concert ABC - 5 phút trước</div>
-                                        </div>
-                                    </div>
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="#">
-                                    <div class="d-flex">
-                                        <div class="flex-shrink-0">
-                                            <i class="fas fa-calendar text-success"></i>
-                                        </div>
-                                        <div class="flex-grow-1 ms-3">
-                                            <div class="fw-bold">Sự kiện sắp diễn ra</div>
-                                            <div class="text-muted small">Festival XYZ - 1 giờ trước</div>
-                                        </div>
-                                    </div>
-                                </a>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-center" href="#all-notifications">Xem tất cả</a></li>
-                        </ul>
-                    </li>
-
-                    <!-- User Profile -->
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" 
-                           role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <img src="https://via.placeholder.com/32x32" alt="Avatar" 
-                                 class="rounded-circle me-2" width="32" height="32">
-                            <span class="d-none d-md-inline">User</span>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <!-- When user is logged in -->
-                            <li class="dropdown-header">
-                                <strong>Chào mừng, User!</strong>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#profile"><i class="fas fa-user me-2"></i>Hồ Sơ</a></li>
-                            <li><a class="dropdown-item" href="#my-tickets"><i class="fas fa-ticket-alt me-2"></i>Vé Của Tôi</a></li>
-                            <li><a class="dropdown-item" href="#my-events"><i class="fas fa-calendar me-2"></i>Sự Kiện Của Tôi</a></li>
-                            <li><a class="dropdown-item" href="#orders"><i class="fas fa-shopping-bag me-2"></i>Đơn Hàng</a></li>
-                            <li><a class="dropdown-item" href="#settings"><i class="fas fa-cog me-2"></i>Cài Đặt</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="#logout"><i class="fas fa-sign-out-alt me-2"></i>Đăng Xuất</a></li>
-                            
-                            <!-- When user is NOT logged in -->
-                            <!-- 
-                            <li><a class="dropdown-item" href="#login"><i class="fas fa-sign-in-alt me-2"></i>Đăng Nhập</a></li>
-                            <li><a class="dropdown-item" href="#register"><i class="fas fa-user-plus me-2"></i>Đăng Ký</a></li>
-                            -->
-                        </ul>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Quick Actions Bar (Optional) -->
-    <div class="bg-light border-bottom py-2 d-none d-lg-block">
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <small class="text-muted">
-                        <i class="fas fa-info-circle me-1"></i>
-                        Đặt vé nhanh chóng, thanh toán an toàn với MoMo & VNPay
-                    </small>
-                </div>
-                <div class="col-md-4 text-end">
-                    <small>
-                        <a href="#support" class="text-decoration-none me-3">
-                            <i class="fas fa-headset me-1"></i>Hỗ Trợ
-                        </a>
-                        <a href="#help" class="text-decoration-none">
-                            <i class="fas fa-question-circle me-1"></i>Trợ Giúp
-                        </a>
-                    </small>
-                </div>
-            </div>
+{% from 'layout/macros.html' import nav_link %}
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold fs-3" href="{{ url_for('index') }}">EventHub</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                {{ nav_link('Trang Chủ', 'index') }}
+                {{ nav_link('Sự Kiện', 'events') }}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="categoryDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Danh Mục
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="categoryDropdown">
+                        <li><a class="dropdown-item" href="{{ url_for('category', category='music') }}">Âm Nhạc</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('category', category='sports') }}">Thể Thao</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('category', category='seminar') }}">Hội Thảo</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('category', category='conference') }}">Hội Nghị</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('category', category='festival') }}">Lễ Hội</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('events') }}">Tất Cả</a></li>
+                    </ul>
+                </li>
+                {{ nav_link('Trending', 'trending') }}
+            </ul>
+            <ul class="navbar-nav ms-auto">
+                {% if current_user.is_authenticated %}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="badge bg-primary">{{ current_user.get_unread_notifications().count() }}</span>
+                        Thông Báo
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationDropdown">
+                        {% for notification in current_user.get_unread_notifications().limit(5).all() %}
+                        <li>
+                            <a class="dropdown-item" href="#">
+                                {{ notification.notification.title }}<br>
+                                <small>{{ notification.notification.message }} - {{ notification.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li><a class="dropdown-item" href="#">Không có thông báo mới</a></li>
+                        {% endfor %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('notifications') }}">Xem tất cả</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Chào mừng, {{ current_user.username }}!
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                        <li><a class="dropdown-item" href="{{ url_for('profile') }}">Hồ Sơ</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('my_tickets') }}">Vé Của Tôi</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('my_events') }}">Sự Kiện Của Tôi</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('orders') }}">Đơn Hàng</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('settings') }}">Cài Đặt</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">Đăng Xuất</a></li>
+                    </ul>
+                </li>
+                {% else %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('auth.login') }}">Đăng Nhập</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('auth.register') }}">Đăng Ký</a>
+                </li>
+                {% endif %}
+            </ul>
         </div>
     </div>
-</header>
+</nav>
+<div class="container-fluid py-2 bg-info text-white text-center">
+    <p class="mb-0">Đặt vé nhanh chóng, thanh toán an toàn với MoMo & VNPay</p>
+    <a href="{{ url_for('support') }}" class="text-white">Hỗ Trợ</a> | 
+    <a href="{{ url_for('support') }}" class="text-white">Trợ Giúp</a>
+</div>
+<div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show mt-3" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+</div>

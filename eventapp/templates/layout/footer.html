@@ -1,141 +1,55 @@
-<!-- Footer -->
-<footer class="footer-section bg-dark text-light pt-5 pb-3">
+<footer class="bg-dark text-white py-4">
     <div class="container">
-        <!-- Main Footer Content -->
         <div class="row">
-            <!-- Company Info -->
-            <div class="col-lg-4 col-md-6 mb-4">
-                <div class="footer-brand mb-3">
-                    <h4 class="fw-bold">
-                        <i class="fas fa-ticket-alt text-warning me-2"></i>
-                        <span class="text-white">Event</span><span class="text-warning">Hub</span>
-                    </h4>
-                </div>
-                <p class="text-muted mb-3">
-                    Hệ thống bán vé sự kiện trực tuyến hàng đầu Việt Nam. 
-                    Kết nối bạn với những trải nghiệm tuyệt vời nhất.
-                </p>
-                <div class="social-links">
-                    <h6 class="fw-bold mb-2">Kết Nối Với Chúng Tôi</h6>
-                    <a href="#" class="text-light me-3 fs-5"><i class="fab fa-facebook-f"></i></a>
-                    <a href="#" class="text-light me-3 fs-5"><i class="fab fa-twitter"></i></a>
-                    <a href="#" class="text-light me-3 fs-5"><i class="fab fa-instagram"></i></a>
-                    <a href="#" class="text-light me-3 fs-5"><i class="fab fa-youtube"></i></a>
-                    <a href="#" class="text-light fs-5"><i class="fab fa-linkedin"></i></a>
-                </div>
-            </div>
-
-            <!-- Quick Links -->
-            <div class="col-lg-2 col-md-6 mb-4">
-                <h6 class="fw-bold mb-3">Liên Kết Nhanh</h6>
+            <div class="col-md-3">
+                <h5 class="fw-bold">EventHub</h5>
+                <p>Hệ thống bán vé sự kiện trực tuyến hàng đầu Việt Nam. Kết nối bạn với những trải nghiệm tuyệt vời nhất.</p>
+                <h6>Kết Nối Với Chúng Tôi</h6>
                 <ul class="list-unstyled">
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Trang Chủ</a></li>
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Sự Kiện</a></li>
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Trending</a></li>
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Về Chúng Tôi</a></li>
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Liên Hệ</a></li>
+                    <li><a href="#" class="text-white"><i class="fab fa-facebook"></i> Facebook</a></li>
+                    <li><a href="#" class="text-white"><i class="fab fa-twitter"></i> Twitter</a></li>
+                    <li><a href="#" class="text-white"><i class="fab fa-instagram"></i> Instagram</a></li>
                 </ul>
             </div>
-
-            <!-- Categories -->
-            <div class="col-lg-2 col-md-6 mb-4">
-                <h6 class="fw-bold mb-3">Danh Mục</h6>
+            <div class="col-md-3">
+                <h5>Liên Kết Nhanh</h5>
                 <ul class="list-unstyled">
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Âm Nhạc</a></li>
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Thể Thao</a></li>
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Hội Thảo</a></li>
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Hội Nghị</a></li>
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Lễ Hội</a></li>
+                    <li><a href="{{ url_for('index') }}" class="text-white">Trang Chủ</a></li>
+                    <li><a href="{{ url_for('events') }}" class="text-white">Sự Kiện</a></li>
+                    <li><a href="{{ url_for('trending') }}" class="text-white">Trending</a></li>
+                    <li><a href="{{ url_for('about') }}" class="text-white">Về Chúng Tôi</a></li>
+                    <li><a href="{{ url_for('contact') }}" class="text-white">Liên Hệ</a></li>
                 </ul>
             </div>
-
-            <!-- Support -->
-            <div class="col-lg-2 col-md-6 mb-4">
-                <h6 class="fw-bold mb-3">Hỗ Trợ</h6>
+            <div class="col-md-3">
+                <h5>Danh Mục</h5>
                 <ul class="list-unstyled">
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Trung Tâm Trợ Giúp</a></li>
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Chính Sách</a></li>
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Điều Khoản</a></li>
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Bảo Mật</a></li>
-                    <li class="mb-2"><a href="#" class="text-muted text-decoration-none">Câu Hỏi Thường Gặp</a></li>
+                    <li><a href="{{ url_for('category', category='music') }}" class="text-white">Âm Nhạc</a></li>
+                    <li><a href="{{ url_for('category', category='sports') }}" class="text-white">Thể Thao</a></li>
+                    <li><a href="{{ url_for('category', category='seminar') }}" class="text-white">Hội Thảo</a></li>
+                    <li><a href="{{ url_for('category', category='conference') }}" class="text-white">Hội Nghị</a></li>
+                    <li><a href="{{ url_for('category', category='festival') }}" class="text-white">Lễ Hội</a></li>
                 </ul>
             </div>
-
-            <!-- Contact Info -->
-            <div class="col-lg-2 col-md-6 mb-4">
-                <h6 class="fw-bold mb-3">Liên Hệ</h6>
+            <div class="col-md-3">
+                <h5>Hỗ Trợ</h5>
                 <ul class="list-unstyled">
-                    <li class="mb-2 text-muted">
-                        <i class="fas fa-phone me-2"></i>
-                        +84 123 456 789
-                    </li>
-                    <li class="mb-2 text-muted">
-                        <i class="fas fa-envelope me-2"></i>
-                        support@eventhub.vn
-                    </li>
-                    <li class="mb-2 text-muted">
-                        <i class="fas fa-map-marker-alt me-2"></i>
-                        Hà Nội, Việt Nam
-                    </li>
+                    <li><a href="{{ url_for('support') }}" class="text-white">Trung Tâm Trợ Giúp</a></li>
+                    <li><a href="{{ url_for('policy') }}" class="text-white">Chính Sách</a></li>
+                    <li><a href="{{ url_for('terms') }}" class="text-white">Điều Khoản</a></li>
+                    <li><a href="{{ url_for('privacy') }}" class="text-white">Bảo Mật</a></li>
+                    <li><a href="{{ url_for('faq') }}" class="text-white">Câu Hỏi Thường Gặp</a></li>
                 </ul>
-                
-                <!-- Payment Methods -->
-                <div class="mt-3">
-                    <h6 class="fw-bold mb-2 small">Thanh Toán</h6>
-                    <div class="payment-methods">
-                        <img src="https://via.placeholder.com/40x25/FF6B9D/FFFFFF?text=MOMO" alt="MoMo" class="me-2 rounded" title="MoMo">
-                        <img src="https://via.placeholder.com/40x25/1E88E5/FFFFFF?text=VNPAY" alt="VNPay" class="me-2 rounded" title="VNPay">
-                        <img src="https://via.placeholder.com/40x25/4CAF50/FFFFFF?text=VISA" alt="Visa" class="rounded" title="Visa">
-                    </div>
-                </div>
+                <h5>Liên Hệ</h5>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-phone"></i> +84 123 456 789</li>
+                    <li><i class="fas fa-envelope"></i> support@eventhub.vn</li>
+                    <li><i class="fas fa-map-marker-alt"></i> Hà Nội, Việt Nam</li>
+                </ul>
+                <h6>Thanh Toán</h6>
+                <img src="https://via.placeholder.com/50x30?text=MoMo" alt="MoMo" class="me-2">
+                <img src="https://via.placeholder.com/50x30?text=VNPay" alt="VNPay">
             </div>
-        </div>
-
-        <hr class="border-secondary my-4">
-
-        <!-- Team & Copyright -->
-        <div class="row align-items-center">
-            <div class="col-md-6">
-                <div class="team-info mb-3 mb-md-0">
-                    <h6 class="fw-bold mb-2">
-                        <i class="fas fa-code text-warning me-2"></i>Team Phát Triển
-                    </h6>
-                    <div class="team-members d-flex flex-wrap gap-3">
-                        <a href="https://github.com/NamNguyen1909" target="_blank" 
-                           class="text-decoration-none text-light d-flex align-items-center team-member">
-                            <i class="fab fa-github me-2"></i>
-                            <span>Nam Nguyen</span>
-                        </a>
-                        <a href="https://github.com/FongFus" target="_blank" 
-                           class="text-decoration-none text-light d-flex align-items-center team-member">
-                            <i class="fab fa-github me-2"></i>
-                            <span>Fong Fus</span>
-                        </a>
-                        <a href="https://github.com/HwPhuc" target="_blank" 
-                           class="text-decoration-none text-light d-flex align-items-center team-member">
-                            <i class="fab fa-github me-2"></i>
-                            <span>Hw Phuc</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 text-md-end">
-                <div class="copyright">
-                    <p class="text-muted mb-1">
-                        &copy; 2025 EventHub. Tất cả quyền được bảo lưu.
-                    </p>
-                    <p class="text-muted small mb-0">
-                        Phát triển với <i class="fas fa-heart text-danger"></i> bởi Team EventHub
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Back to Top Button -->
-        <div class="back-to-top position-fixed bottom-0 end-0 m-4">
-            <button class="btn btn-primary btn-sm rounded-circle p-2" onclick="scrollToTop()" title="Về đầu trang">
-                <i class="fas fa-chevron-up"></i>
-            </button>
         </div>
     </div>
 </footer>

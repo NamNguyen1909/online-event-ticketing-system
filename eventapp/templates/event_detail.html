@@ -1,0 +1,26 @@
+{% extends 'layout/base.html' %}
+
+{% block title %}{{ event.title }} - EventHub{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>{{ event.title }}</h1>
+    <div class="row">
+        <div class="col-md-6">
+            {% if event.poster_url %}
+            <img src="{{ event.poster_url }}" class="img-fluid" alt="{{ event.title }}">
+            {% else %}
+            <img src="https://via.placeholder.com/600x400" class="img-fluid" alt="No poster">
+            {% endif %}
+        </div>
+        <div class="col-md-6">
+            <p><strong>Loại:</strong> {{ event.category.value|capitalize }}</p>
+            <p><strong>Thời gian:</strong> {{ event.start_time.strftime('%d/%m/%Y %H:%M') }} - {{ event.end_time.strftime('%d/%m/%Y %H:%M') }}</p>
+            <p><strong>Địa điểm:</strong> {{ event.location }}</p>
+            <p><strong>Vé còn lại:</strong> {{ event.available_tickets }}/{{ event.total_tickets }}</p>
+            <p>{{ event.description }}</p>
+            <a href="#" class="btn btn-primary">Đặt Vé</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -3,241 +3,88 @@
 {% block title %}EventHub - Hệ Thống Bán Vé Sự Kiện Trực Tuyến{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <!-- Hero Section -->
-    <section class="hero-section bg-primary text-white py-5 rounded-3 mb-5">
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col-lg-6">
-                    <h1 class="display-4 fw-bold mb-4">
-                        Chào Mừng Đến Với <span class="text-warning">EventHub</span>
-                    </h1>
-                    <p class="lead mb-4">
-                        Khám phá và đặt vé cho những sự kiện tuyệt vời nhất. 
-                        Từ concert âm nhạc đến hội thảo công nghệ, chúng tôi có tất cả!
-                    </p>
-                    <div class="d-flex gap-3">
-                        <a href="#events" class="btn btn-warning btn-lg px-4">
-                            <i class="fas fa-calendar-alt me-2"></i>Xem Sự Kiện
-                        </a>
-                        <a href="#trending" class="btn btn-outline-light btn-lg px-4">
-                            <i class="fas fa-fire me-2"></i>Trending
-                        </a>
-                    </div>
-                </div>
-                <div class="col-lg-6 text-center">
-                    <img src="https://via.placeholder.com/500x300/6C63FF/FFFFFF?text=EventHub" 
-                         alt="EventHub" class="img-fluid rounded shadow">
-                </div>
+<div class="container">
+    <section class="text-center my-5">
+        <h1>Chào Mừng Đến Với EventHub</h1>
+        <p>Khám phá và đặt vé cho những sự kiện tuyệt vời nhất. Từ concert âm nhạc đến hội thảo công nghệ, chúng tôi có tất cả!</p>
+        <a href="{{ url_for('events') }}" class="btn btn-primary">Xem Sự Kiện</a>
+        <a href="{{ url_for('trending') }}" class="btn btn-secondary">Trending</a>
+    </section>
+
+    <section class="my-5">
+        <div class="row text-center">
+            <div class="col-md-3">
+                <h3>150+</h3>
+                <p>Sự Kiện Đã Tổ Chức</p>
+            </div>
+            <div class="col-md-3">
+                <h3>10K+</h3>
+                <p>Người Dùng Hài Lòng</p>
+            </div>
+            <div class="col-md-3">
+                <h3>50K+</h3>
+                <p>Vé Đã Bán</p>
+            </div>
+            <div class="col-md-3">
+                <h3>4.8</h3>
+                <p>Đánh Giá Trung Bình</p>
             </div>
         </div>
     </section>
 
-    <!-- Quick Stats -->
-    <section class="stats-section mb-5">
-        <div class="container">
-            <div class="row g-4">
-                <div class="col-lg-3 col-md-6">
-                    <div class="card border-0 shadow-sm text-center h-100">
-                        <div class="card-body">
-                            <i class="fas fa-calendar-check text-primary fs-1 mb-3"></i>
-                            <h3 class="fw-bold text-primary">150+</h3>
-                            <p class="text-muted mb-0">Sự Kiện Đã Tổ Chức</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6">
-                    <div class="card border-0 shadow-sm text-center h-100">
-                        <div class="card-body">
-                            <i class="fas fa-users text-success fs-1 mb-3"></i>
-                            <h3 class="fw-bold text-success">10K+</h3>
-                            <p class="text-muted mb-0">Người Dùng Hài Lòng</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6">
-                    <div class="card border-0 shadow-sm text-center h-100">
-                        <div class="card-body">
-                            <i class="fas fa-ticket-alt text-warning fs-1 mb-3"></i>
-                            <h3 class="fw-bold text-warning">50K+</h3>
-                            <p class="text-muted mb-0">Vé Đã Bán</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6">
-                    <div class="card border-0 shadow-sm text-center h-100">
-                        <div class="card-body">
-                            <i class="fas fa-star text-danger fs-1 mb-3"></i>
-                            <h3 class="fw-bold text-danger">4.8</h3>
-                            <p class="text-muted mb-0">Đánh Giá Trung Bình</p>
-                        </div>
+    <section class="my-5">
+        <h2 class="text-center">Sự Kiện Nổi Bật</h2>
+        <p class="text-center">Khám phá những sự kiện hot nhất hiện tại</p>
+        <div class="row">
+            {% for event in events %}
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    {% if event.poster_url %}
+                    <img src="{{ event.poster_url }}" class="card-img-top" alt="{{ event.title }}">
+                    {% else %}
+                    <img src="https://via.placeholder.com/300x200" class="card-img-top" alt="No poster">
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title">{{ event.title }}</h5>
+                        <p><strong>{{ event.category.value|capitalize }}</strong> - {{ event.price|default('Free') }}</p>
+                        <p>{{ event.start_time.strftime('%d/%m/%Y') }}<br>{{ event.location }}</p>
+                        <p>{{ event.available_tickets }}/{{ event.total_tickets }} vé</p>
+                        <a href="{{ url_for('event_detail', event_id=event.id) }}" class="btn btn-primary">Đặt Vé</a>
                     </div>
                 </div>
             </div>
+            {% else %}
+            <p class="text-center">Không có sự kiện nổi bật.</p>
+            {% endfor %}
+        </div>
+        <div class="text-center">
+            <a href="{{ url_for('events') }}" class="btn btn-outline-primary">Xem Tất Cả Sự Kiện</a>
         </div>
     </section>
 
-    <!-- Featured Events -->
-    <section class="featured-events mb-5" id="events">
-        <div class="container">
-            <div class="row mb-4">
-                <div class="col-12 text-center">
-                    <h2 class="fw-bold mb-3">Sự Kiện Nổi Bật</h2>
-                    <p class="text-muted">Khám phá những sự kiện hot nhất hiện tại</p>
-                </div>
+    <section class="my-5">
+        <h2 class="text-center">Tại Sao Chọn EventHub?</h2>
+        <p class="text-center">Những lý do khiến EventHub trở thành lựa chọn hàng đầu</p>
+        <div class="row text-center">
+            <div class="col-md-4">
+                <h4>Thanh Toán An Toàn</h4>
+                <p>Hỗ trợ MoMo, VNPay và các phương thức thanh toán an toàn</p>
             </div>
-            
-            <div class="row g-4">
-                <!-- Event Card 1 -->
-                <div class="col-lg-4 col-md-6">
-                    <div class="card border-0 shadow-sm h-100 event-card">
-                        <img src="https://via.placeholder.com/350x200/FF6B9D/FFFFFF?text=Music+Concert" 
-                             class="card-img-top" alt="Concert">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <span class="badge bg-primary">Âm Nhạc</span>
-                                <span class="text-danger fw-bold">500.000đ</span>
-                            </div>
-                            <h5 class="card-title">Concert Âm Nhạc Mùa Hè</h5>
-                            <p class="card-text text-muted">
-                                <i class="fas fa-calendar me-1"></i>25/07/2025<br>
-                                <i class="fas fa-map-marker-alt me-1"></i>Hà Nội, Việt Nam
-                            </p>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <small class="text-muted">
-                                    <i class="fas fa-users me-1"></i>150/200 vé
-                                </small>
-                                <button class="btn btn-primary btn-sm add-to-cart-btn" 
-                                        data-event-id="1" data-ticket-type-id="1">
-                                    <i class="fas fa-cart-plus me-1"></i>Đặt Vé
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Event Card 2 -->
-                <div class="col-lg-4 col-md-6">
-                    <div class="card border-0 shadow-sm h-100 event-card">
-                        <img src="https://via.placeholder.com/350x200/4ECDC4/FFFFFF?text=Tech+Conference" 
-                             class="card-img-top" alt="Conference">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <span class="badge bg-success">Hội Nghị</span>
-                                <span class="text-danger fw-bold">Free</span>
-                            </div>
-                            <h5 class="card-title">Hội Nghị Công Nghệ 2025</h5>
-                            <p class="card-text text-muted">
-                                <i class="fas fa-calendar me-1"></i>30/07/2025<br>
-                                <i class="fas fa-map-marker-alt me-1"></i>TP.HCM, Việt Nam
-                            </p>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <small class="text-muted">
-                                    <i class="fas fa-users me-1"></i>450/500 vé
-                                </small>
-                                <button class="btn btn-success btn-sm add-to-cart-btn" 
-                                        data-event-id="2" data-ticket-type-id="2">
-                                    <i class="fas fa-cart-plus me-1"></i>Đăng Ký
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Event Card 3 -->
-                <div class="col-lg-4 col-md-6">
-                    <div class="card border-0 shadow-sm h-100 event-card">
-                        <img src="https://via.placeholder.com/350x200/FFD93D/FFFFFF?text=Sports+Event" 
-                             class="card-img-top" alt="Sports">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <span class="badge bg-warning">Thể Thao</span>
-                                <span class="text-danger fw-bold">300.000đ</span>
-                            </div>
-                            <h5 class="card-title">Giải Bóng Đá Mùa Hè</h5>
-                            <p class="card-text text-muted">
-                                <i class="fas fa-calendar me-1"></i>05/08/2025<br>
-                                <i class="fas fa-map-marker-alt me-1"></i>Đà Nẵng, Việt Nam
-                            </p>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <small class="text-muted">
-                                    <i class="fas fa-users me-1"></i>800/1000 vé
-                                </small>
-                                <button class="btn btn-warning btn-sm add-to-cart-btn" 
-                                        data-event-id="3" data-ticket-type-id="3">
-                                    <i class="fas fa-cart-plus me-1"></i>Đặt Vé
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="col-md-4">
+                <h4>Đặt Vé Nhanh Chóng</h4>
+                <p>Quy trình đặt vé đơn giản, chỉ trong vài phút</p>
             </div>
-
-            <div class="text-center mt-4">
-                <a href="#all-events" class="btn btn-outline-primary btn-lg">
-                    Xem Tất Cả Sự Kiện <i class="fas fa-arrow-right ms-2"></i>
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Why Choose Us -->
-    <section class="why-choose-us bg-light py-5 rounded-3">
-        <div class="container">
-            <div class="row mb-5">
-                <div class="col-12 text-center">
-                    <h2 class="fw-bold mb-3">Tại Sao Chọn EventHub?</h2>
-                    <p class="text-muted">Những lý do khiến EventHub trở thành lựa chọn hàng đầu</p>
-                </div>
-            </div>
-            
-            <div class="row g-4">
-                <div class="col-lg-4 col-md-6">
-                    <div class="text-center">
-                        <i class="fas fa-shield-alt text-primary fs-1 mb-3"></i>
-                        <h5 class="fw-bold">Thanh Toán An Toàn</h5>
-                        <p class="text-muted">Hỗ trợ MoMo, VNPay và các phương thức thanh toán an toàn</p>
-                    </div>
-                </div>
-                <div class="col-lg-4 col-md-6">
-                    <div class="text-center">
-                        <i class="fas fa-clock text-success fs-1 mb-3"></i>
-                        <h5 class="fw-bold">Đặt Vé Nhanh Chóng</h5>
-                        <p class="text-muted">Quy trình đặt vé đơn giản, chỉ trong vài phút</p>
-                    </div>
-                </div>
-                <div class="col-lg-4 col-md-6">
-                    <div class="text-center">
-                        <i class="fas fa-headset text-warning fs-1 mb-3"></i>
-                        <h5 class="fw-bold">Hỗ Trợ 24/7</h5>
-                        <p class="text-muted">Đội ngũ hỗ trợ khách hàng chuyên nghiệp luôn sẵn sàng</p>
-                    </div>
-                </div>
+            <div class="col-md-4">
+                <h4>Hỗ Trợ 24/7</h4>
+                <p>Đội ngũ hỗ trợ khách hàng chuyên nghiệp luôn sẵn sàng</p>
             </div>
         </div>
     </section>
 </div>
-
 {% endblock %}
 
 {% block extra_css %}
 <style>
-.event-card {
-    transition: all 0.3s ease;
-}
-
-.event-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
-}
-
-.hero-section {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.stats-section .card:hover {
-    transform: translateY(-3px);
-    transition: all 0.3s ease;
-}
+    .card-img-top { height: 200px; object-fit: cover; }
 </style>
 {% endblock %}
