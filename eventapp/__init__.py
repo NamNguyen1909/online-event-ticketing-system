@@ -2,22 +2,29 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import cloudinary
+import os
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 
-# Khai báo chuỗi kết nối DB
-app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://root:ThanhNam*1909@localhost/event"
+# Cấu hình database từ environment variables
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///eventapp.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'your-secret-key-here-change-in-production'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here-change-in-production')
 
 # Khởi tạo ORM và Migrate
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-cloudinary.config(cloud_name='dncgine9e',
-                  api_key='257557947612624',
-                  api_secret='88EDQ7-Ltwzn1oaI4tT_UIb_bWI')
+# Cấu hình Cloudinary từ environment variables
+cloudinary.config(
+    cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.getenv('CLOUDINARY_API_KEY'),
+    api_secret=os.getenv('CLOUDINARY_API_SECRET')
+)
 
 # Import routes sau khi khởi tạo app
 from eventapp import routes
