@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from flask_login import UserMixin
 from sqlalchemy.orm import relationship
 from sqlalchemy import CheckConstraint, Index
 import enum
@@ -25,7 +26,7 @@ class CustomerGroup(enum.Enum):
     vip = 'vip'
     super_vip = 'super_vip'
 
-class User(db.Model):
+class User(db.Model, UserMixin):
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -49,6 +50,10 @@ class User(db.Model):
     payments = relationship('Payment', back_populates='user', lazy='dynamic')
     reviews = relationship('Review', back_populates='user', lazy='dynamic')
     user_notifications = relationship('UserNotification', back_populates='user', lazy='dynamic')
+
+    def get_id(self):
+        """Phương thức bắt buộc bởi Flask-Login để lấy ID người dùng"""
+        return str(self.id)
 
     def __repr__(self):
         return f'<User {self.username}>'
