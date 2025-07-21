@@ -37,7 +37,7 @@ def validate_password(password):
         return False, "Mật khẩu phải chứa ít nhất một ký tự đặc biệt"
     return True, ""
 
-@auth_bp.route('/dang-ky', methods=['GET', 'POST'])
+@auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         try:
@@ -96,7 +96,7 @@ def register():
     
     return render_template('auth/register.html')
 
-@auth_bp.route('/dang-nhap', methods=['GET', 'POST'])
+@auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         try:
@@ -135,7 +135,7 @@ def login():
     return render_template('auth/login.html')
 
 
-@auth_bp.route('/dang-xuat', methods=['POST'])
+@auth_bp.route('/logout', methods=['POST'])
 @login_required
 def logout():
     try:
@@ -146,7 +146,7 @@ def logout():
         flash(f'Đã xảy ra lỗi: {str(e)}', 'danger')
         return redirect(url_for('index'))
 
-@auth_bp.route('/kiem-tra-dang-nhap', methods=['GET'])
+@auth_bp.route('/check-auth', methods=['GET'])
 def check_auth():
     logging.debug('Bắt đầu xử lý yêu cầu /auth/kiem-tra-dang-nhap')
     try:

@@ -57,15 +57,21 @@
                         <li><a class="dropdown-item" href="{{ url_for('orders') }}">Đơn Hàng</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('settings') }}">Cài Đặt</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">Đăng Xuất</a></li>
+                        <li>
+                            <form action="{{ url_for('auth.logout') }}" method="POST" id="logoutForm">
+                                <button type="submit" class="dropdown-item text-danger">
+                                    <i class="fas fa-sign-out-alt"></i> Đăng xuất
+                                </button>
+                            </form>
+                        </li>
                     </ul>
                 </li>
                 {% else %}
                 <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('auth.login') }}">Đăng Nhập</a>
+                    <a class="nav-link" href="{{ url_for('auth.login') }}">Đăng nhập</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('auth.register') }}">Đăng Ký</a>
+                    <a class="nav-link" href="{{ url_for('auth.register') }}">Đăng ký</a>
                 </li>
                 {% endif %}
             </ul>
