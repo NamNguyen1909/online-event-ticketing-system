@@ -1,34 +1,13 @@
-import json
-import os
+from sqlalchemy import or_
+from eventapp.models import User
+from eventapp import db
 
+def check_user(username):
+    return User.query.filter(User.username == username).first()
 
-def auth_user(username, password):
-    # Get the directory of current file
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    json_path = os.path.join(current_dir, 'data', 'users.json')
-    
-    try:
-        with open(json_path, encoding='utf-8') as f:
-            data = json.load(f)
-        
-        # Access users array from JSON structure
-        users = data.get('users', [])
-        
-        for user in users:
-            # Convert password to string for comparison
-            if user['username'] == username and str(user['password']) == str(password):
-                return True
-        
-        return False
-    
-    except FileNotFoundError:
-        print(f"File not found: {json_path}")
-        return False
-    except json.JSONDecodeError:
-        print("Invalid JSON format")
-        return False
+def check_email(email):
+    return User.query.filter(User.email == email).first()
 
-
-if __name__ == "__main__":
-    print(auth_user("admin", "456"))
-    print(auth_user("user", "123"))
+def get_user_by_username(username):
+    user = User.query.filter(User.username == username).first()
+    return user.id if user else None

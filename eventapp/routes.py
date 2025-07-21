@@ -117,3 +117,5 @@ def debug_events():
     """Debug route để xem có events nào trong database"""
     events = Event.query.all()
     return f"Có {len(events)} events trong database: {[e.id for e in events]}"
+
+

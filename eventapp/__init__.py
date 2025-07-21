@@ -13,7 +13,8 @@ app = Flask(__name__)
 # Cấu hình database từ environment variables
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///eventapp.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here-change-in-production')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 's1f7@N0pb6$Yz!Fq3Zx#Mle*2d@9Kq')
+
 
 # Khởi tạo ORM và Migrate
 db = SQLAlchemy(app)

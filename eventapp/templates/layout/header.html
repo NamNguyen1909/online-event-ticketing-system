@@ -3,7 +3,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top shadow">
         <div class="container">
             <!-- Brand Logo -->
-            <a class="navbar-brand fw-bold fs-3" href="{{ url_for('home') }}">
+            <a class="navbar-brand fw-bold fs-3" href="{{ url_for('index') }}">
                 <i class="fas fa-ticket-alt text-warning me-2"></i>
                 <span class="text-white">Event</span><span class="text-warning">Hub</span>
             </a>
@@ -19,12 +19,12 @@
                 <!-- Main Navigation -->
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <li class="nav-item">
-                        <a class="nav-link active" href="{{ url_for('home') }}">
+                        <a class="nav-link active" href="{{ url_for('index') }}">
                             <i class="fas fa-home me-1"></i>Trang Chủ
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#events">
+                        <a class="nav-link" href="{{ url_for('events') }}">
                             <i class="fas fa-calendar-alt me-1"></i>Sự Kiện
                         </a>
                     </li>
@@ -34,17 +34,17 @@
                             <i class="fas fa-list me-1"></i>Danh Mục
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#music"><i class="fas fa-music me-2"></i>Âm Nhạc</a></li>
-                            <li><a class="dropdown-item" href="#sports"><i class="fas fa-futbol me-2"></i>Thể Thao</a></li>
-                            <li><a class="dropdown-item" href="#seminar"><i class="fas fa-chalkboard-teacher me-2"></i>Hội Thảo</a></li>
-                            <li><a class="dropdown-item" href="#conference"><i class="fas fa-users me-2"></i>Hội Nghị</a></li>
-                            <li><a class="dropdown-item" href="#festival"><i class="fas fa-star me-2"></i>Lễ Hội</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('category', category='music') }}"><i class="fas fa-music me-2"></i>Âm Nhạc</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('category', category='sports') }}"><i class="fas fa-futbol me-2"></i>Thể Thao</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('category', category='seminar') }}"><i class="fas fa-chalkboard-teacher me-2"></i>Hội Thảo</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('category', category='conference') }}"><i class="fas fa-users me-2"></i>Hội Nghị</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('category', category='festival') }}"><i class="fas fa-star me-2"></i>Lễ Hội</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#all"><i class="fas fa-th me-2"></i>Tất Cả</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('events') }}"><i class="fas fa-th me-2"></i>Tất Cả</a></li>
                         </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#trending">
+                        <a class="nav-link" href="{{ url_for('trending') }}">
                             <i class="fas fa-fire text-danger me-1"></i>Trending
                         </a>
                     </li>
@@ -115,41 +115,73 @@
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-center" href="#all-notifications">Xem tất cả</a></li>
+                            <li><a class="dropdown-item text-center" href="{{ url_for('notifications') }}">Xem tất cả</a></li>
                         </ul>
                     </li>
 
                     <!-- User Profile -->
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" 
-                           role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <img src="https://via.placeholder.com/32x32" alt="Avatar" 
-                                 class="rounded-circle me-2" width="32" height="32">
-                            <span class="d-none d-md-inline">User</span>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <!-- When user is logged in -->
-                            <li class="dropdown-header">
-                                <strong>Chào mừng, User!</strong>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#profile"><i class="fas fa-user me-2"></i>Hồ Sơ</a></li>
-                            <li><a class="dropdown-item" href="#my-tickets"><i class="fas fa-ticket-alt me-2"></i>Vé Của Tôi</a></li>
-                            <li><a class="dropdown-item" href="#my-events"><i class="fas fa-calendar me-2"></i>Sự Kiện Của Tôi</a></li>
-                            <li><a class="dropdown-item" href="#orders"><i class="fas fa-shopping-bag me-2"></i>Đơn Hàng</a></li>
-                            <li><a class="dropdown-item" href="#settings"><i class="fas fa-cog me-2"></i>Cài Đặt</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="#logout"><i class="fas fa-sign-out-alt me-2"></i>Đăng Xuất</a></li>
-                            
-                            <!-- When user is NOT logged in -->
-                            <!-- 
-                            <li><a class="dropdown-item" href="#login"><i class="fas fa-sign-in-alt me-2"></i>Đăng Nhập</a></li>
-                            <li><a class="dropdown-item" href="#register"><i class="fas fa-user-plus me-2"></i>Đăng Ký</a></li>
-                            -->
-                        </ul>
+                        {% if current_user.is_authenticated %}
+                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" 
+                               role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <img src="{{ current_user.avatar_url or 'https://via.placeholder.com/32x32' }}" alt="Avatar" 
+                                     class="rounded-circle me-2" width="32" height="32">
+                                <span class="d-none d-md-inline">{{ current_user.username }}</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li class="dropdown-header">
+                                    <strong>Chào mừng, {{ current_user.username }}!</strong>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user me-2"></i>Hồ Sơ</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('my_tickets') }}"><i class="fas fa-ticket-alt me-2"></i>Vé Của Tôi</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('my_events') }}"><i class="fas fa-calendar me-2"></i>Sự Kiện Của Tôi</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('orders') }}"><i class="fas fa-shopping-bag me-2"></i>Đơn Hàng</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('settings') }}"><i class="fas fa-cog me-2"></i>Cài Đặt</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal"><i class="fas fa-sign-out-alt me-2"></i>Đăng Xuất</a></li>
+                            </ul>
+                        {% else %}
+                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" 
+                               role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <img src="https://via.placeholder.com/32x32" alt="Avatar" 
+                                     class="rounded-circle me-2" width="32" height="32">
+                                <span class="d-none d-md-inline">Khách</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="{{ url_for('auth.login') }}"><i class="fas fa-sign-in-alt me-2"></i>Đăng Nhập</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('auth.register') }}"><i class="fas fa-user-plus me-2"></i>Đăng Ký</a></li>
+                            </ul>
+                        {% endif %}
                     </li>
                 </ul>
             </div>
         </div>
     </nav>
+
+
+    <!-- Logout Confirmation Modal -->
+    <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="logoutModalLabel">
+                        <i class="fas fa-sign-out-alt me-2"></i>Xác nhận đăng xuất
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Bạn có chắc chắn muốn đăng xuất?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <form method="POST" action="{{ url_for('auth.logout') }}">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-sign-out-alt me-2"></i>Đăng Xuất
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </header>
