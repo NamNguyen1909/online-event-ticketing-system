@@ -46,9 +46,9 @@ def register():
             email = data.get('email')
             password = data.get('password')
             phone = data.get('phone')
-            first_name = data.get('first_name')  # Không sử dụng trong DB, chỉ để tương thích
-            last_name = data.get('last_name')   # Không sử dụng trong DB, chỉ để tương thích
-            cmnd = data.get('cmnd')             # Không sử dụng trong DB, chỉ để tương thích
+            first_name = data.get('first_name')  
+            last_name = data.get('last_name')   
+            cmnd = data.get('cmnd')             
 
             # Kiểm tra dữ liệu đầu vào
             if not all([username, email, password]):
