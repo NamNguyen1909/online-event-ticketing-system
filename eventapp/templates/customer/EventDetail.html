@@ -804,7 +804,8 @@
                             {% endfor %}
                         {% endif %}
                         
-                        <!-- Reply button -->
+                        <!-- Reply button - chỉ hiện cho staff và organizer -->
+                        {% if can_reply %}
                         <div class="mt-2">
                             <button class="reply-button" onclick="toggleReplyForm({{ review.id }})">
                                 <i class="fas fa-reply me-1"></i>Trả lời
@@ -819,7 +820,7 @@
                                 </div>
                             </div>
                             <div class="mt-2 d-flex gap-2">
-                                <button class="btn btn-primary btn-sm">
+                                <button class="btn btn-primary btn-sm" onclick="submitReply({{ review.id }})">
                                     <i class="fas fa-paper-plane me-1"></i>Gửi
                                 </button>
                                 <button class="btn btn-secondary btn-sm" onclick="toggleReplyForm({{ review.id }})">
@@ -827,6 +828,7 @@
                                 </button>
                             </div>
                         </div>
+                        {% endif %}
                     </div>
                     {% endfor %}
                     
@@ -839,6 +841,19 @@
                     {% endif %}
                 {% else %}
                     <p class="text-muted text-center mt-3">Chưa có đánh giá nào cho sự kiện này.</p>
+                {% endif %}
+                
+                <!-- Thông báo cho user chưa đăng nhập hoặc không có quyền -->
+                {% if not can_reply and not current_user %}
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <a href="/login">Đăng nhập</a> để có thể tương tác với đánh giá.
+                </div>
+                {% elif not can_reply and current_user %}
+                <div class="alert alert-secondary mt-3">
+                    <i class="fas fa-lock me-2"></i>
+                    Chỉ nhân viên và người tổ chức mới có thể trả lời đánh giá.
+                </div>
                 {% endif %}
             </div>
         </div>
@@ -864,8 +879,9 @@ function redirectToBooking() {
     window.location.href = `/booking/event/${eventId}`;
 }
 
-// Toggle reply form
+// Toggle reply form - chỉ hoạt động khi user có quyền
 function toggleReplyForm(reviewId) {
+    {% if can_reply %}
     const form = document.getElementById(`reply-form-${reviewId}`);
     if (form.style.display === 'none') {
         form.style.display = 'block';
@@ -874,10 +890,14 @@ function toggleReplyForm(reviewId) {
         form.style.display = 'none';
         form.querySelector('textarea').value = '';
     }
+    {% else %}
+    alert('Bạn không có quyền trả lời đánh giá.');
+    {% endif %}
 }
 
 // Handle reply submission (placeholder)
 function submitReply(reviewId) {
+    {% if can_reply %}
     const textarea = document.querySelector(`#reply-form-${reviewId} textarea`);
     const content = textarea.value.trim();
     
@@ -892,6 +912,9 @@ function submitReply(reviewId) {
     
     // Hide form and clear content
     toggleReplyForm(reviewId);
+    {% else %}
+    alert('Bạn không có quyền trả lời đánh giá.');
+    {% endif %}
 }
 </script>
 {% endblock %}

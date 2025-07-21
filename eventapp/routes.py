@@ -1,6 +1,6 @@
 from eventapp import app, db
 from eventapp.models import Event, TicketType, Review, User
-from flask import render_template, request, abort
+from flask import render_template, request, abort, session
 from sqlalchemy.orm import joinedload
 from datetime import datetime
 
@@ -67,11 +67,23 @@ def event_detail(event_id):
         print(f"Stats calculated: {stats}")
         print(f"Rendering template with event category: {event.category.value}")
         
+        # Kiểm tra quyền trả lời review
+        current_user = None
+        can_reply = False
+        
+        if 'user_id' in session:
+            current_user = User.query.get(session['user_id'])
+            if current_user:
+                # Cho phép reply nếu user là staff hoặc organizer
+                can_reply = current_user.role in ['staff', 'organizer']
+        
         return render_template('customer/EventDetail.html', 
                              event=event, 
                              ticket_types=active_ticket_types,
                              reviews=main_reviews,
-                             stats=stats)
+                             stats=stats,
+                             current_user=current_user,
+                             can_reply=can_reply)
                              
     except Exception as e:
         print(f"Error in event_detail: {str(e)}")
