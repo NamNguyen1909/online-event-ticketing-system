@@ -1,0 +1,527 @@
+{% extends 'layout/base.html' %}
+
+{% block title %}{{ event.title }} - EventHub{% endblock %}
+
+{% block extra_css %}
+<style>
+    .event-image {
+        width: 100%;
+        height: 400px;
+        object-fit: cover;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    
+    .event-info-card {
+        background: #fff;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .event-title {
+        color: #2c3e50;
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+    }
+    
+    .event-meta {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .event-meta:last-child {
+        border-bottom: none;
+    }
+    
+    .event-meta i {
+        width: 25px;
+        color: #3498db;
+        margin-right: 15px;
+        font-size: 1.2rem;
+    }
+    
+    .event-meta-content {
+        flex: 1;
+    }
+    
+    .meta-label {
+        font-weight: 600;
+        color: #34495e;
+        margin-bottom: 5px;
+    }
+    
+    .meta-value {
+        color: #7f8c8d;
+        font-size: 0.95rem;
+    }
+    
+    .event-description {
+        background: #f8f9fa;
+        padding: 25px;
+        border-radius: 10px;
+        border-left: 4px solid #3498db;
+        line-height: 1.8;
+    }
+    
+    .ticket-section {
+        background: #fff;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        margin-top: 20px;
+    }
+    
+    .ticket-type-card {
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 15px;
+        transition: all 0.3s ease;
+    }
+    
+    .ticket-type-card:hover {
+        border-color: #3498db;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(52,152,219,0.2);
+    }
+    
+    .ticket-price {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #e74c3c;
+    }
+    
+    .ticket-quantity {
+        font-size: 0.9rem;
+        color: #7f8c8d;
+    }
+    
+    .btn-book-ticket {
+        background: linear-gradient(45deg, #3498db, #2980b9);
+        border: none;
+        padding: 12px 30px;
+        border-radius: 25px;
+        color: white;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-book-ticket:hover {
+        background: linear-gradient(45deg, #2980b9, #1f4e79);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(52,152,219,0.4);
+        color: white;
+    }
+    
+    .btn-book-ticket:disabled {
+        background: #bdc3c7;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+    
+    .event-stats {
+        display: flex;
+        justify-content: space-around;
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 10px;
+        margin: 20px 0;
+    }
+    
+    .stat-item {
+        text-align: center;
+    }
+    
+    .stat-number {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #2c3e50;
+        display: block;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        color: #7f8c8d;
+        margin-top: 5px;
+    }
+    
+    .rating-stars {
+        color: #f39c12;
+        margin-left: 10px;
+    }
+    
+    .review-card {
+        background: #fff;
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 15px;
+    }
+    
+    .review-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    
+    .reviewer-name {
+        font-weight: 600;
+        color: #2c3e50;
+    }
+    
+    .review-date {
+        font-size: 0.85rem;
+        color: #7f8c8d;
+    }
+    
+    .review-rating {
+        color: #f39c12;
+        margin-bottom: 10px;
+    }
+    
+    .event-status {
+        display: inline-block;
+        padding: 8px 15px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-upcoming {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .status-ongoing {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-past {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .organizer-info {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 10px;
+        margin-top: 15px;
+    }
+    
+    .organizer-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('home') }}">Trang chủ</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('event_list') }}">Sự kiện</a></li>
+            <li class="breadcrumb-item active">{{ event.title }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Cột trái - Thông tin sự kiện -->
+        <div class="col-lg-8">
+            <div class="event-info-card">
+                <!-- Tiêu đề và trạng thái -->
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h1 class="event-title">{{ event.title }}</h1>
+                    {% if event.is_upcoming %}
+                        <span class="event-status status-upcoming">Sắp diễn ra</span>
+                    {% elif event.is_ongoing %}
+                        <span class="event-status status-ongoing">Đang diễn ra</span>
+                    {% else %}
+                        <span class="event-status status-past">Đã kết thúc</span>
+                    {% endif %}
+                </div>
+
+                <!-- Thông tin meta -->
+                <div class="event-meta">
+                    <i class="far fa-calendar-alt"></i>
+                    <div class="event-meta-content">
+                        <div class="meta-label">Thời gian</div>
+                        <div class="meta-value">
+                            <strong>Bắt đầu:</strong> {{ event.start_time.strftime('%d/%m/%Y lúc %H:%M') }}<br>
+                            <strong>Kết thúc:</strong> {{ event.end_time.strftime('%d/%m/%Y lúc %H:%M') }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="event-meta">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <div class="event-meta-content">
+                        <div class="meta-label">Địa điểm</div>
+                        <div class="meta-value">{{ event.location }}</div>
+                    </div>
+                </div>
+
+                <div class="event-meta">
+                    <i class="fas fa-tag"></i>
+                    <div class="event-meta-content">
+                        <div class="meta-label">Danh mục</div>
+                        <div class="meta-value">
+                            <span class="badge bg-primary">{{ event.category.value.title() }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="event-meta">
+                    <i class="fas fa-user"></i>
+                    <div class="event-meta-content">
+                        <div class="meta-label">Người tổ chức</div>
+                        <div class="meta-value">{{ event.organizer.username }}</div>
+                    </div>
+                </div>
+
+                {% if stats.average_rating > 0 %}
+                <div class="event-meta">
+                    <i class="fas fa-star"></i>
+                    <div class="event-meta-content">
+                        <div class="meta-label">Đánh giá</div>
+                        <div class="meta-value">
+                            {{ stats.average_rating }}/5.0
+                            <span class="rating-stars">
+                                {% for i in range(5) %}
+                                    {% if i < stats.average_rating %}
+                                        <i class="fas fa-star"></i>
+                                    {% else %}
+                                        <i class="far fa-star"></i>
+                                    {% endif %}
+                                {% endfor %}
+                            </span>
+                            ({{ stats.review_count }} đánh giá)
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Thống kê -->
+            <div class="event-stats">
+                <div class="stat-item">
+                    <span class="stat-number">{{ stats.total_tickets }}</span>
+                    <div class="stat-label">Tổng vé</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">{{ stats.sold_tickets }}</span>
+                    <div class="stat-label">Đã bán</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">{{ stats.available_tickets }}</span>
+                    <div class="stat-label">Còn lại</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">{{ "{:,.0f}".format(stats.revenue) }}đ</span>
+                    <div class="stat-label">Doanh thu</div>
+                </div>
+            </div>
+
+            <!-- Mô tả -->
+            <div class="event-info-card">
+                <h4><i class="fas fa-info-circle me-2"></i>Mô tả sự kiện</h4>
+                <div class="event-description">
+                    {{ event.description }}
+                </div>
+            </div>
+
+            <!-- Thông tin người tổ chức -->
+            <div class="event-info-card">
+                <h4><i class="fas fa-user-tie me-2"></i>Người tổ chức</h4>
+                <div class="organizer-info">
+                    <div class="d-flex align-items-center">
+                        {% if event.organizer.avatar_thumbnail_url %}
+                            <img src="{{ event.organizer.avatar_thumbnail_url }}" 
+                                 alt="{{ event.organizer.username }}" 
+                                 class="organizer-avatar me-3">
+                        {% else %}
+                            <div class="organizer-avatar me-3 bg-secondary d-flex align-items-center justify-content-center">
+                                <i class="fas fa-user text-white"></i>
+                            </div>
+                        {% endif %}
+                        <div>
+                            <h6 class="mb-1">{{ event.organizer.username }}</h6>
+                            <small class="text-muted">Tham gia từ {{ event.organizer.created_at.strftime('%m/%Y') }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reviews -->
+            {% if reviews %}
+            <div class="event-info-card">
+                <h4><i class="fas fa-comments me-2"></i>Đánh giá từ khách hàng</h4>
+                {% for review in reviews %}
+                <div class="review-card">
+                    <div class="review-header">
+                        <span class="reviewer-name">{{ review.user.username }}</span>
+                        <span class="review-date">{{ review.created_at.strftime('%d/%m/%Y') }}</span>
+                    </div>
+                    <div class="review-rating">
+                        {% for i in range(5) %}
+                            {% if i < review.rating %}
+                                <i class="fas fa-star"></i>
+                            {% else %}
+                                <i class="far fa-star"></i>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% if review.comment %}
+                    <p class="mb-0">{{ review.comment }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% if stats.review_count > 5 %}
+                <div class="text-center">
+                    <button class="btn btn-outline-primary">Xem tất cả {{ stats.review_count }} đánh giá</button>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Cột phải - Hình ảnh và đặt vé -->
+        <div class="col-lg-4">
+            <!-- Hình ảnh sự kiện -->
+            <div class="mb-4">
+                {% if event.poster_url %}
+                    <img src="{{ event.poster_url }}" 
+                         alt="{{ event.title }}" 
+                         class="event-image">
+                {% else %}
+                    <div class="event-image bg-light d-flex align-items-center justify-content-center">
+                        <div class="text-center text-muted">
+                            <i class="fas fa-image fa-3x mb-3"></i>
+                            <p>Chưa có hình ảnh</p>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Đặt vé -->
+            {% if ticket_types and event.is_upcoming %}
+            <div class="ticket-section">
+                <h4 class="mb-3"><i class="fas fa-ticket-alt me-2"></i>Đặt vé</h4>
+                
+                {% for ticket_type in ticket_types %}
+                <div class="ticket-type-card">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h6 class="mb-1">{{ ticket_type.name }}</h6>
+                            {% if ticket_type.description %}
+                            <small class="text-muted">{{ ticket_type.description }}</small>
+                            {% endif %}
+                        </div>
+                        <div class="text-end">
+                            <div class="ticket-price">{{ "{:,.0f}".format(ticket_type.price) }}đ</div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="ticket-quantity">
+                            {% if ticket_type.is_sold_out %}
+                                <span class="text-danger"><i class="fas fa-times-circle"></i> Hết vé</span>
+                            {% else %}
+                                <span class="text-success">
+                                    <i class="fas fa-check-circle"></i> 
+                                    Còn {{ ticket_type.available_quantity }} vé
+                                </span>
+                            {% endif %}
+                        </div>
+                        
+                        {% if not ticket_type.is_sold_out %}
+                        <button class="btn btn-book-ticket btn-sm">
+                            <i class="fas fa-shopping-cart me-1"></i>Đặt vé
+                        </button>
+                        {% else %}
+                        <button class="btn btn-book-ticket btn-sm" disabled>
+                            Hết vé
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                
+                <div class="text-center mt-3">
+                    <button class="btn btn-book-ticket btn-lg w-100">
+                        <i class="fas fa-credit-card me-2"></i>Đặt vé ngay
+                    </button>
+                </div>
+            </div>
+            {% elif event.is_past %}
+            <div class="ticket-section text-center">
+                <i class="fas fa-clock fa-3x text-muted mb-3"></i>
+                <h5>Sự kiện đã kết thúc</h5>
+                <p class="text-muted">Sự kiện này đã diễn ra và kết thúc.</p>
+            </div>
+            {% elif event.is_sold_out %}
+            <div class="ticket-section text-center">
+                <i class="fas fa-sold-out fa-3x text-danger mb-3"></i>
+                <h5>Đã hết vé</h5>
+                <p class="text-muted">Tất cả các loại vé đã được bán hết.</p>
+            </div>
+            {% else %}
+            <div class="ticket-section text-center">
+                <i class="fas fa-ticket-alt fa-3x text-muted mb-3"></i>
+                <h5>Chưa có vé</h5>
+                <p class="text-muted">Người tổ chức chưa thiết lập các loại vé cho sự kiện này.</p>
+            </div>
+            {% endif %}
+
+            <!-- Share buttons -->
+            <div class="ticket-section">
+                <h6><i class="fas fa-share-alt me-2"></i>Chia sẻ sự kiện</h6>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary btn-sm flex-fill">
+                        <i class="fab fa-facebook-f"></i> Facebook
+                    </button>
+                    <button class="btn btn-outline-info btn-sm flex-fill">
+                        <i class="fab fa-twitter"></i> Twitter
+                    </button>
+                    <button class="btn btn-outline-success btn-sm flex-fill">
+                        <i class="fab fa-whatsapp"></i> WhatsApp
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Xử lý click vào nút đặt vé
+    $('.btn-book-ticket').click(function() {
+        // TODO: Implement ticket booking functionality
+        console.log('Booking ticket...');
+        alert('Chức năng đặt vé sẽ được triển khai trong phiên bản tiếp theo!');
+    });
+    
+    // Xử lý chia sẻ
+    $('.btn-outline-primary, .btn-outline-info, .btn-outline-success').click(function() {
+        // TODO: Implement sharing functionality
+        console.log('Sharing event...');
+        alert('Chức năng chia sẻ sẽ được triển khai trong phiên bản tiếp theo!');
+    });
+});
+</script>
+{% endblock %}
