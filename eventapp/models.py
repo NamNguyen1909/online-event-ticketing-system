@@ -282,6 +282,14 @@ class Event(db.Model):
     def get_active_ticket_types(self):
         """Get only active ticket types"""
         return [tt for tt in self.ticket_types if tt.is_active]
+    
+    @property
+    def is_sold_out(self):
+        """Check if all ticket types are sold out"""
+        ticket_types_list = list(self.ticket_types)
+        if not ticket_types_list:
+            return False  # No ticket types means not sold out
+        return all(tt.is_sold_out for tt in ticket_types_list)
 
 class TicketType(db.Model):
     __tablename__ = 'ticket_types'
