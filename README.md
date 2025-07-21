@@ -31,3 +31,6 @@ set FLASK_APP=app.py && set FLASK_ENV=development && flask run
 
 python index.py
 ```
+
+
+http://127.0.0.1:5000/event/<id>
