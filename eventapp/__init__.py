@@ -9,7 +9,7 @@ app = Flask(__name__)
 # Cấu hình ứng dụng
 app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://root:Admin%40123@localhost/event"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here-change-in-production')
+app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 's1f7@N0pb6$Yz!Fq3Zx#Mle*2d@9Kq')
 
 # Khởi tạo ORM và Migrate
 db = SQLAlchemy(app)

@@ -5,6 +5,7 @@ from eventapp import app, db
 from eventapp.models import User, UserRole
 from eventapp.dao import check_user, check_email
 import re
+import logging
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -102,6 +103,7 @@ def login():
             data = request.get_json() if request.is_json else request.form
             username_or_email = data.get('username_or_email')
             password = data.get('password')
+            logging.debug(f"Yêu cầu đăng nhập: username_or_email={username_or_email}")
 
             if not username_or_email or not password:
                 flash('Thiếu tên người dùng/email hoặc mật khẩu', 'danger')
@@ -110,6 +112,7 @@ def login():
             user = User.query.filter(
                 (User.username == username_or_email) | (User.email == username_or_email)
             ).first()
+            logging.debug(f"Kết quả truy vấn user: {user}")
 
             if not user or not check_password_hash(user.password_hash, password):
                 flash('Thông tin đăng nhập không hợp lệ', 'danger')
@@ -120,14 +123,17 @@ def login():
                 return redirect(url_for('auth.login'))
 
             login_user(user, remember=data.get('remember_me', False))
+            logging.debug(f"Đăng nhập thành công cho user: {user.username}")
             flash('Đăng nhập thành công!', 'success')
             return redirect(url_for('index'))
 
         except Exception as e:
+            logging.error(f"Lỗi trong quá trình đăng nhập: {str(e)}")
             flash(f'Đã xảy ra lỗi: {str(e)}', 'danger')
             return redirect(url_for('auth.login'))
     
     return render_template('auth/login.html')
+
 
 @auth_bp.route('/dang-xuat', methods=['POST'])
 @login_required
@@ -142,14 +148,22 @@ def logout():
 
 @auth_bp.route('/kiem-tra-dang-nhap', methods=['GET'])
 def check_auth():
-    if current_user.is_authenticated:
-        return jsonify({
-            'is_authenticated': True,
-            'user': {
-                'id': current_user.id,
-                'username': current_user.username,
-                'email': current_user.email,
-                'role': current_user.role.value
-            }
-        }), 200
-    return jsonify({'is_authenticated': False}), 200
+    logging.debug('Bắt đầu xử lý yêu cầu /auth/kiem-tra-dang-nhap')
+    try:
+        if current_user.is_authenticated:
+            logging.debug(f'Người dùng đã xác thực: {current_user.username}')
+            return jsonify({
+                'is_authenticated': True,
+                'user': {
+                    'id': current_user.id,
+                    'username': current_user.username,
+                    'email': current_user.email,
+                    'role': current_user.role.value
+                }
+            }), 200
+        else:
+            logging.debug('Người dùng chưa xác thực')
+            return jsonify({'is_authenticated': False}), 200
+    except Exception as e:
+        logging.error(f'Lỗi trong check_auth: {str(e)}')
+        return jsonify({'error': 'Lỗi server nội bộ'}), 500
