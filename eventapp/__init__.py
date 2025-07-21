@@ -4,6 +4,7 @@ from flask_migrate import Migrate
 import cloudinary
 import os
 from dotenv import load_dotenv
+from flask_login import current_user
 
 # Load environment variables from .env file
 load_dotenv()
@@ -15,10 +16,14 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///eve
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 's1f7@N0pb6$Yz!Fq3Zx#Mle*2d@9Kq')
 
-
 # Khởi tạo ORM và Migrate
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+# Context processor để thêm current_user vào tất cả templates
+@app.context_processor
+def inject_user():
+    return dict(current_user=current_user)
 
 # Cấu hình Cloudinary từ environment variables
 cloudinary.config(
@@ -29,3 +34,7 @@ cloudinary.config(
 
 # Import routes sau khi khởi tạo app
 from eventapp import routes
+
+# Import và đăng ký auth blueprint
+from eventapp.auth import auth_bp
+app.register_blueprint(auth_bp, url_prefix='/auth')

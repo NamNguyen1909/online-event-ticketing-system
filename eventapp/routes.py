@@ -1,12 +1,16 @@
 from eventapp import app, db
-from eventapp.models import Event, TicketType, Review, User
+from eventapp.models import Event, TicketType, Review, User, EventCategory, Ticket, Payment, UserNotification, EventTrendingLog
 from flask import render_template, request, abort, session
 from sqlalchemy.orm import joinedload
 from datetime import datetime
+from flask import render_template, redirect, url_for
+from flask_login import login_required, current_user
 
 @app.route('/')
-def home():
-    return render_template('index.html')
+def index():
+    """Trang chủ"""
+    featured_events = Event.query.filter_by(is_active=True).limit(3).all()
+    return render_template('index.html', events=featured_events)
 
 @app.route('/event/<int:event_id>')
 def event_detail(event_id):
@@ -68,21 +72,21 @@ def event_detail(event_id):
         print(f"Rendering template with event category: {event.category.value}")
         
         # Kiểm tra quyền trả lời review
-        current_user = None
+        current_user_obj = None
         can_reply = False
         
         if 'user_id' in session:
-            current_user = User.query.get(session['user_id'])
-            if current_user:
+            current_user_obj = User.query.get(session['user_id'])
+            if current_user_obj:
                 # Cho phép reply nếu user là staff hoặc organizer
-                can_reply = current_user.role in ['staff', 'organizer']
+                can_reply = current_user_obj.role in ['staff', 'organizer']
         
         return render_template('customer/EventDetail.html', 
                              event=event, 
                              ticket_types=active_ticket_types,
                              reviews=main_reviews,
                              stats=stats,
-                             current_user=current_user,
+                             current_user=current_user_obj,
                              can_reply=can_reply)
                              
     except Exception as e:
@@ -92,7 +96,7 @@ def event_detail(event_id):
         abort(500)
 
 @app.route('/events')
-def event_list():
+def events():
     """Danh sách sự kiện"""
     page = request.args.get('page', 1, type=int)
     category = request.args.get('category', '')
@@ -112,10 +116,109 @@ def event_list():
     
     return render_template('customer/EventList.html', events=events)
 
+@app.route('/trending')
+def trending():
+    """Hiển thị sự kiện trending"""
+    try:
+        trending_events = Event.query.join(EventTrendingLog).order_by(EventTrendingLog.trending_score.desc()).limit(10).all()
+        return render_template('customer/EventList.html', events={'items': trending_events}, category_title='Sự Kiện Trending')
+    except Exception as e:
+        print(f"Error in trending: {e}")
+        events = Event.query.filter_by(is_active=True).order_by(Event.start_time.desc()).limit(10).all()
+        return render_template('customer/EventList.html', events={'items': events}, category_title='Sự Kiện Phổ Biến')
+
+@app.route('/category/<category>')
+def category(category):
+    """Hiển thị sự kiện theo danh mục"""
+    try:
+        category_enum = EventCategory[category.lower()]
+        events = Event.query.filter_by(category=category_enum, is_active=True).all()
+        
+        category_titles = {
+            'music': 'Âm Nhạc',
+            'sports': 'Thể Thao', 
+            'seminar': 'Hội Thảo',
+            'conference': 'Hội Nghị',
+            'festival': 'Lễ Hội',
+            'workshop': 'Workshop',
+            'party': 'Tiệc Party',
+            'competition': 'Cuộc Thi',
+            'other': 'Khác'
+        }
+        
+        category_title = category_titles.get(category.lower(), category.title())
+        
+        return render_template('customer/EventList.html', 
+                             events={'items': events}, 
+                             category=category,
+                             category_title=category_title)
+    except KeyError:
+        abort(404)
+
+@app.route('/support')
+def support():
+    return render_template('support.html')
+
+@app.route('/about')
+def about():
+    return render_template('about.html')
+
+@app.route('/contact')
+def contact():
+    return render_template('contact.html')
+
+@app.route('/policy')
+def policy():
+    return render_template('policy.html')
+
+@app.route('/terms')
+def terms():
+    return render_template('terms.html')
+
+@app.route('/privacy')
+def privacy():
+    return render_template('privacy.html')
+
+@app.route('/faq')
+def faq():
+    return render_template('faq.html')
+
+@app.route('/profile')
+@login_required
+def profile():
+    return render_template('profile.html', user=current_user)
+
+@app.route('/my-tickets')
+@login_required
+def my_tickets():
+    tickets = Ticket.query.filter_by(user_id=current_user.id).all()
+    return render_template('my_tickets.html', tickets=tickets)
+
+@app.route('/my-events')
+@login_required
+def my_events():
+    events = Event.query.filter_by(organizer_id=current_user.id).all()
+    return render_template('my_events.html', events=events)
+
+@app.route('/orders')
+@login_required
+def orders():
+    payments = Payment.query.filter_by(user_id=current_user.id).all()
+    return render_template('orders.html', payments=payments)
+
+@app.route('/settings')
+@login_required
+def settings():
+    return render_template('settings.html', user=current_user)
+
+@app.route('/notifications')
+@login_required
+def notifications():
+    notifications = UserNotification.query.filter_by(user_id=current_user.id).order_by(UserNotification.created_at.desc()).all()
+    return render_template('notifications.html', notifications=notifications)
+
 @app.route('/debug/events')
 def debug_events():
     """Debug route để xem có events nào trong database"""
     events = Event.query.all()
     return f"Có {len(events)} events trong database: {[e.id for e in events]}"
-
-
