@@ -504,15 +504,19 @@ class DiscountCode(db.Model):
 
     def get_user_group(self, user):
         """Determine user group based on total_spent - should match User.get_customer_group()"""
-        now = datetime.utcnow()
-        if (now - user.created_at) <= timedelta(days=7):
+        try:
+            now = datetime.utcnow()
+            if (now - user.created_at) <= timedelta(days=7):
+                return CustomerGroup.new
+            elif user.total_spent < 500000:
+                return CustomerGroup.regular
+            elif user.total_spent < 2000000:
+                return CustomerGroup.vip
+            else:
+                return CustomerGroup.super_vip
+        except Exception as e:
+            print(f"Error in get_user_group: {e}")
             return CustomerGroup.new
-        elif user.total_spent < 500000:
-            return CustomerGroup.regular
-        elif user.total_spent < 2000000:
-            return CustomerGroup.vip
-        else:
-            return CustomerGroup.super_vip
 
 class Payment(db.Model):
     __tablename__ = 'payments'
