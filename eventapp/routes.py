@@ -222,3 +222,91 @@ def debug_events():
     """Debug route để xem có events nào trong database"""
     events = Event.query.all()
     return f"Có {len(events)} events trong database: {[e.id for e in events]}"
+
+
+# Routes cho Staff
+@app.route('/staff/scan')
+@login_required
+def staff_scan():
+    if current_user.role.value != 'staff':
+        abort(403)
+    return render_template('staff/scan.html')
+
+# Routes cho Organizer
+@app.route('/organizer/dashboard')
+@login_required
+def organizer_dashboard():
+    if current_user.role.value != 'organizer':
+        abort(403)
+    return render_template('organizer/dashboard.html')
+
+@app.route('/organizer/create-event')
+@login_required
+def create_event():
+    if current_user.role.value != 'organizer':
+        abort(403)
+    return render_template('organizer/create_event.html')
+
+@app.route('/organizer/analytics')
+@login_required
+def event_analytics():
+    if current_user.role.value != 'organizer':
+        abort(403)
+    return render_template('organizer/analytics.html')
+
+@app.route('/organizer/staff-management')
+@login_required
+def manage_staff():
+    if current_user.role.value != 'organizer':
+        abort(403)
+    return render_template('organizer/staff_management.html')
+
+@app.route('/organizer/add-staff')
+@login_required
+def add_staff():
+    if current_user.role.value != 'organizer':
+        abort(403)
+    return render_template('organizer/add_staff.html')
+
+@app.route('/organizer/staff-permissions')
+@login_required
+def staff_permissions():
+    if current_user.role.value != 'organizer':
+        abort(403)
+    return render_template('organizer/permissions.html')
+
+@app.route('/organizer/revenue-reports')
+@login_required
+def revenue_reports():
+    if current_user.role.value != 'organizer':
+        abort(403)
+    return render_template('organizer/revenue_reports.html')
+
+# Routes cho Admin
+@app.route('/admin/dashboard')
+@login_required
+def admin_dashboard():
+    if current_user.role.value != 'admin':
+        abort(403)
+    return render_template('admin/dashboard.html')
+
+@app.route('/admin/users')
+@login_required
+def user_management():
+    if current_user.role.value != 'admin':
+        abort(403)
+    return render_template('admin/user_management.html')
+
+@app.route('/admin/events/moderation')
+@login_required
+def event_moderation():
+    if current_user.role.value != 'admin':
+        abort(403)
+    return render_template('admin/event_moderation.html')
+
+@app.route('/admin/settings')
+@login_required
+def system_settings():
+    if current_user.role.value != 'admin':
+        abort(403)
+    return render_template('admin/settings.html')
