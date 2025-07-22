@@ -5,6 +5,8 @@ from sqlalchemy.orm import joinedload
 from datetime import datetime
 from flask import render_template, redirect, url_for
 from flask_login import login_required, current_user
+from flask import render_template, request, redirect, url_for, flash
+from flask_login import login_required, current_user
 
 @app.route('/')
 def index():
@@ -91,25 +93,73 @@ def event_detail(event_id):
         traceback.print_exc()
         abort(500)
 
+# Code cũ
+# @app.route('/events')
+# def events():
+#     """Danh sách sự kiện"""
+#     page = request.args.get('page', 1, type=int)
+#     category = request.args.get('category', '')
+#     search = request.args.get('search', '')
+    
+#     query = Event.query.filter_by(is_active=True)
+    
+#     if category:
+#         query = query.filter_by(category=category)
+    
+#     if search:
+#         query = query.filter(Event.title.contains(search))
+    
+#     events = query.order_by(Event.start_time.desc()).paginate(
+#         page=page, per_page=12, error_out=False
+#     )
+    
+#     return render_template('customer/EventList.html', events=events)
+
 @app.route('/events')
 def events():
-    """Danh sách sự kiện"""
+    """Danh sách sự kiện với tìm kiếm và bộ lọc"""
     page = request.args.get('page', 1, type=int)
     category = request.args.get('category', '')
     search = request.args.get('search', '')
-    
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    min_price = request.args.get('min_price', type=float)
+    max_price = request.args.get('max_price', type=float)
+
     query = Event.query.filter_by(is_active=True)
-    
+
     if category:
-        query = query.filter_by(category=category)
-    
+        query = query.filter(Event.category == category)
+
     if search:
-        query = query.filter(Event.title.contains(search))
-    
+        query = query.filter(Event.title.ilike(f'%{search}%'))
+
+    if start_date:
+        try:
+            from datetime import datetime
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            query = query.filter(Event.start_time >= start_dt)
+        except:
+            pass
+
+    if end_date:
+        try:
+            from datetime import datetime
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+            query = query.filter(Event.end_time <= end_dt)
+        except:
+            pass
+
+    # Lọc theo giá vé thấp nhất của event
+    if min_price is not None:
+        query = query.join(Event.ticket_types).filter(TicketType.price >= min_price)
+    if max_price is not None:
+        query = query.join(Event.ticket_types).filter(TicketType.price <= max_price)
+
     events = query.order_by(Event.start_time.desc()).paginate(
         page=page, per_page=12, error_out=False
     )
-    
+
     return render_template('customer/EventList.html', events=events)
 
 @app.route('/trending')
@@ -145,9 +195,9 @@ def category(category):
         category_title = category_titles.get(category.lower(), category.title())
         
         return render_template('customer/EventList.html', 
-                             events={'items': events}, 
-                             category=category,
-                             category_title=category_title)
+                      events=events, 
+                      category=category,
+                      category_title=category_title)
     except KeyError:
         abort(404)
 
