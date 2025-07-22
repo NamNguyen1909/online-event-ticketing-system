@@ -1,6 +1,6 @@
-from eventapp import app, db
-from eventapp.models import Event, TicketType, Review, User, EventCategory, Ticket, Payment, UserNotification, EventTrendingLog
-from flask import render_template, request, abort, session
+from eventapp import app, db,login_manager
+from eventapp.models import DiscountCode, Event, PaymentMethod, TicketType, Review, User, EventCategory, Ticket, Payment, UserNotification, EventTrendingLog
+from flask import flash, jsonify, render_template, request, abort, session
 from sqlalchemy.orm import joinedload
 from datetime import datetime
 from flask import render_template, redirect, url_for
@@ -71,23 +71,19 @@ def event_detail(event_id):
         print(f"Stats calculated: {stats}")
         print(f"Rendering template with event category: {event.category.value}")
         
-        # Kiểm tra quyền trả lời review
-        current_user_obj = None
+        # Kiểm tra quyền trả lời review dựa trên Flask-Login's current_user
         can_reply = False
+        if current_user.is_authenticated:
+            # Cho phép reply nếu user là staff hoặc organizer
+            can_reply = current_user.role.value in ['staff', 'organizer']
         
-        if 'user_id' in session:
-            current_user_obj = User.query.get(session['user_id'])
-            if current_user_obj:
-                # Cho phép reply nếu user là staff hoặc organizer
-                can_reply = current_user_obj.role in ['staff', 'organizer']
-        
+        # KHÔNG override current_user trong template context
         return render_template('customer/EventDetail.html', 
                              event=event, 
                              ticket_types=active_ticket_types,
                              reviews=main_reviews,
                              stats=stats,
-                             current_user=current_user_obj,
-                             can_reply=can_reply)
+                             can_reply=can_reply)  # ✅ Loại bỏ current_user=current_user_obj
                              
     except Exception as e:
         print(f"Error in event_detail: {str(e)}")
@@ -310,3 +306,158 @@ def system_settings():
     if current_user.role.value != 'admin':
         abort(403)
     return render_template('admin/settings.html')
+
+@app.route('/booking/event/<int:event_id>')
+@login_required
+def book_ticket(event_id):
+    """Trang đặt vé cho sự kiện"""
+    try:
+        print(f"[BOOK_TICKET] User {current_user.username} accessing event {event_id}")
+        
+        # Load event thông thường (không dùng joinedload cho ticket_types)
+        event = Event.query.filter_by(id=event_id, is_active=True).first()
+        
+        if not event:
+            print(f"[BOOK_TICKET] Event {event_id} not found or not active")
+            flash('Sự kiện không tồn tại hoặc đã bị xóa.', 'error')
+            return redirect(url_for('events'))
+        
+        print(f"[BOOK_TICKET] Found event: {event.title}")
+        
+        # Load ticket types riêng biệt
+        all_ticket_types = TicketType.query.filter_by(event_id=event_id).all()
+        print(f"[BOOK_TICKET] Event has {len(all_ticket_types)} ticket types")
+        
+        # Lấy các ticket types đang hoạt động và còn vé
+        available_ticket_types = [tt for tt in all_ticket_types 
+                                if tt.is_active and tt.sold_quantity < tt.total_quantity]
+        
+        print(f"[BOOK_TICKET] Available ticket types: {len(available_ticket_types)}")
+        
+        if not available_ticket_types:
+            print(f"[BOOK_TICKET] No available tickets for event {event_id}")
+            flash('Sự kiện này hiện tại đã hết vé.', 'warning')
+            return redirect(url_for('event_detail', event_id=event_id))
+        
+        # Kiểm tra method get_user_group có tồn tại không
+        try:
+            user_group = current_user.get_customer_group()  
+            print(f"[BOOK_TICKET] User group: {user_group}")
+        except Exception as e:
+            print(f"[BOOK_TICKET] Error getting user group: {e}")
+            from eventapp.models import CustomerGroup
+            user_group = CustomerGroup.new  # Default group
+
+        # Sửa query discount codes:
+        try:
+            current_time = datetime.now()
+            available_discounts = DiscountCode.query.filter(
+                DiscountCode.user_group == user_group,  # Sửa từ customer_group thành user_group
+                DiscountCode.is_active == True,
+                DiscountCode.valid_from <= current_time,
+                DiscountCode.valid_to >= current_time,
+                DiscountCode.used_count < DiscountCode.max_uses  # Sửa từ usage_count thành used_count và usage_limit thành max_uses
+            ).all()
+            print(f"[BOOK_TICKET] Found {len(available_discounts)} discount codes")
+        except Exception as e:
+            print(f"[BOOK_TICKET] Error loading discount codes: {e}")
+            available_discounts = []
+        
+        print(f"[BOOK_TICKET] Rendering BookTicket.html")
+        return render_template('customer/BookTicket.html', 
+                             event=event,
+                             ticket_types=available_ticket_types,
+                             discount_codes=available_discounts,
+                             payment_methods=PaymentMethod)
+                             
+    except Exception as e:
+        print(f"[BOOK_TICKET] Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash('Đã xảy ra lỗi khi tải trang đặt vé.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/booking/process', methods=['POST'])
+@login_required
+def process_booking():
+    """Xử lý thông tin đặt vé"""
+    try:
+        data = request.get_json()
+        
+        # Log thông tin booking để kiểm tra
+        print("=== BOOKING INFORMATION ===")
+        print(f"User: {current_user.username} (ID: {current_user.id})")
+        print(f"Event ID: {data.get('event_id')}")
+        print(f"Tickets: {data.get('tickets')}")
+        print(f"Payment Method: {data.get('payment_method')}")
+        print(f"Discount Code: {data.get('discount_code', 'None')}")
+        print(f"Subtotal: {data.get('subtotal')}")
+        print(f"Discount Amount: {data.get('discount_amount')}")
+        print(f"Total Amount: {data.get('total_amount')}")
+        print("========================")
+        
+        # Validation
+        if not data.get('tickets') or len(data.get('tickets')) == 0:
+            return jsonify({'success': False, 'message': 'Vui lòng chọn ít nhất một loại vé.'})
+        
+        total_tickets = sum(ticket['quantity'] for ticket in data.get('tickets'))
+        if total_tickets == 0:
+            return jsonify({'success': False, 'message': 'Vui lòng chọn ít nhất một vé.'})
+        
+        # Kiểm tra tồn kho
+        for ticket in data.get('tickets'):
+            ticket_type = TicketType.query.get(ticket['ticket_type_id'])
+            if not ticket_type or ticket['quantity'] > (ticket_type.total_quantity - ticket_type.sold_quantity):
+                return jsonify({'success': False, 'message': f'Không đủ vé loại {ticket_type.name if ticket_type else "Unknown"}'})
+        
+        return jsonify({'success': True, 'message': 'Đặt vé thành công! (Demo mode)'})
+        
+    except Exception as e:
+        print(f"Error in process_booking: {str(e)}")
+        return jsonify({'success': False, 'message': 'Đã xảy ra lỗi khi xử lý đặt vé.'})
+    
+@app.route('/debug/session')
+def debug_session():
+    """Debug session info"""
+    import json
+    from flask import session
+    
+    session_info = {
+        'current_user_authenticated': current_user.is_authenticated,
+        'current_user_id': current_user.id if current_user.is_authenticated else None,
+        'current_user_username': current_user.username if current_user.is_authenticated else None,
+        'session_keys': list(session.keys()),
+        'session_permanent': session.permanent,
+    }
+    
+    return f"<pre>{json.dumps(session_info, indent=2)}</pre>"
+
+# Thêm vào routes.py
+@app.route('/debug/full-session')
+def debug_full_session():
+    """Debug session info chi tiết"""
+    import json
+    from flask import session, request
+    
+    session_info = {
+        'request_headers': dict(request.headers),
+        'request_cookies': dict(request.cookies),
+        'current_user_authenticated': current_user.is_authenticated,
+        'current_user_id': current_user.id if current_user.is_authenticated else None,
+        'current_user_username': current_user.username if current_user.is_authenticated else None,
+        'session_items': dict(session),
+        'session_permanent': session.permanent,
+        'session_modified': session.modified,
+        'app_secret_key_set': bool(app.config.get('SECRET_KEY')),
+        'login_manager_user_loader': login_manager.user_loader is not None,
+    }
+    
+    return f"<pre>{json.dumps(session_info, indent=2, default=str)}</pre>"
+
+@app.route('/test-auth')
+def test_auth():
+    """Test authentication status"""
+    if current_user.is_authenticated:
+        return f"<h2>Đã đăng nhập</h2><p>User: {current_user.username}</p><p>ID: {current_user.id}</p>"
+    else:
+        return f"<h2>Chưa đăng nhập</h2><p><a href='{url_for('auth.login')}'>Đăng nhập</a></p>"

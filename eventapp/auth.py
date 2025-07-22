@@ -1,22 +1,16 @@
 from flask import Blueprint, request, jsonify, flash, redirect, url_for, render_template
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from eventapp import app, db
 from eventapp.models import User, UserRole
 from eventapp.dao import check_user, check_email
 import re
 import logging
+from datetime import timedelta
 
 auth_bp = Blueprint('auth', __name__)
 
-# Khởi tạo Flask-Login
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'auth.login'
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
+# Loại bỏ LoginManager khởi tạo ở đây vì đã có trong __init__.py
 
 def validate_email(email):
     """Kiểm tra định dạng email"""
@@ -46,9 +40,6 @@ def register():
             email = data.get('email')
             password = data.get('password')
             phone = data.get('phone')
-            first_name = data.get('first_name')  
-            last_name = data.get('last_name')   
-            cmnd = data.get('cmnd')             
 
             # Kiểm tra dữ liệu đầu vào
             if not all([username, email, password]):
@@ -85,9 +76,12 @@ def register():
             db.session.commit()
 
             # Đăng nhập người dùng sau khi đăng ký thành công
-            login_user(user)
+            login_user(user, remember=True)  # Thêm remember=True
             flash('Đăng ký thành công! Chào mừng bạn đến với EventHub.', 'success')
-            return redirect(url_for('index'))
+            
+            # Redirect về trang được yêu cầu trước đó hoặc trang chủ
+            next_page = request.args.get('next')
+            return redirect(next_page) if next_page else redirect(url_for('index'))
 
         except Exception as e:
             db.session.rollback()
@@ -103,6 +97,8 @@ def login():
             data = request.get_json() if request.is_json else request.form
             username_or_email = data.get('username_or_email')
             password = data.get('password')
+            remember_me = data.get('remember_me', False)
+            
             logging.debug(f"Yêu cầu đăng nhập: username_or_email={username_or_email}")
 
             if not username_or_email or not password:
@@ -112,7 +108,6 @@ def login():
             user = User.query.filter(
                 (User.username == username_or_email) | (User.email == username_or_email)
             ).first()
-            logging.debug(f"Kết quả truy vấn user: {user}")
 
             if not user or not check_password_hash(user.password_hash, password):
                 flash('Thông tin đăng nhập không hợp lệ', 'danger')
@@ -122,10 +117,19 @@ def login():
                 flash('Tài khoản đã bị vô hiệu hóa', 'danger')
                 return redirect(url_for('auth.login'))
 
-            login_user(user, remember=data.get('remember_me', False))
+            # Set session permanent trước khi login
+            from flask import session
+            session.permanent = True
+            
+            # Đăng nhập với remember
+            login_user(user, remember=True, duration=timedelta(days=30))  # Force remember với duration
+            
             logging.debug(f"Đăng nhập thành công cho user: {user.username}")
             flash('Đăng nhập thành công!', 'success')
-            return redirect(url_for('index'))
+            
+            # Redirect về trang được yêu cầu trước đó hoặc trang chủ
+            next_page = request.args.get('next')
+            return redirect(next_page) if next_page else redirect(url_for('index'))
 
         except Exception as e:
             logging.error(f"Lỗi trong quá trình đăng nhập: {str(e)}")
@@ -133,7 +137,6 @@ def login():
             return redirect(url_for('auth.login'))
     
     return render_template('auth/login.html')
-
 
 @auth_bp.route('/logout', methods=['POST'])
 @login_required
@@ -148,7 +151,7 @@ def logout():
 
 @auth_bp.route('/check-auth', methods=['GET'])
 def check_auth():
-    logging.debug('Bắt đầu xử lý yêu cầu /auth/kiem-tra-dang-nhap')
+    logging.debug('Bắt đầu xử lý yêu cầu /auth/check-auth')
     try:
         if current_user.is_authenticated:
             logging.debug(f'Người dùng đã xác thực: {current_user.username}')
