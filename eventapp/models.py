@@ -5,9 +5,7 @@ from sqlalchemy import CheckConstraint, Index
 import enum
 import uuid
 import math
-
 from eventapp import db
-# Import cloudinary trực tiếp
 import cloudinary
 import cloudinary.uploader
 from cloudinary import CloudinaryImage

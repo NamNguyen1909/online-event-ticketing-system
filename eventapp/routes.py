@@ -286,6 +286,7 @@ def book_ticket(event_id):
         # Lấy mã giảm giá
         available_discounts = dao.get_user_discount_codes(user_group)
         print(f"[BOOK_TICKET] Found {len(available_discounts)} discount codes")
+
         
         print(f"[BOOK_TICKET] Rendering BookTicket.html")
         return render_template('customer/BookTicket.html', 
