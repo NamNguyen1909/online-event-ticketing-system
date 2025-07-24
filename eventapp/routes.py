@@ -85,7 +85,7 @@ def event_detail(event_id):
                              ticket_types=active_ticket_types,
                              reviews=main_reviews,
                              stats=stats,
-                             can_reply=can_reply)  # ✅ Loại bỏ current_user=current_user_obj
+                             can_reply=can_reply)
                              
     except Exception as e:
         print(f"Error in event_detail: {str(e)}")
@@ -402,11 +402,11 @@ def book_ticket(event_id):
         try:
             current_time = datetime.now()
             available_discounts = DiscountCode.query.filter(
-                DiscountCode.user_group == user_group,  # Sửa từ customer_group thành user_group
+                DiscountCode.user_group == user_group,
                 DiscountCode.is_active == True,
                 DiscountCode.valid_from <= current_time,
                 DiscountCode.valid_to >= current_time,
-                DiscountCode.used_count < DiscountCode.max_uses  # Sửa từ usage_count thành used_count và usage_limit thành max_uses
+                DiscountCode.used_count < DiscountCode.max_uses
             ).all()
             print(f"[BOOK_TICKET] Found {len(available_discounts)} discount codes")
         except Exception as e:
