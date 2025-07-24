@@ -94,7 +94,7 @@ def create_events(users, num_events=30):
     
     for i in range(num_events):
         start_time = fake.date_time_between(start_date='-1m', end_date='+3m')
-        end_time = start_time + timedelta(hours=random.randint(2, 12))
+        end_time = start_time + timedelta(hours=random.randint(3, 12))
         
         event = Event(
             organizer_id=random.choice(organizers).id,
