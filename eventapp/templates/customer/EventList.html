@@ -1,0 +1,214 @@
+{% extends 'layout/base.html' %}
+
+{% block title %}Danh sách sự kiện - EventHub{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Trang chủ</a></li>
+            <li class="breadcrumb-item active">Sự kiện</li>
+        </ol>
+    </nav>
+
+    <h2 class="event-list-title">
+        {% if category_title %}
+            {{ category_title }}
+        {% else %}
+            Danh sách sự kiện
+        {% endif %}
+    </h2>
+
+    <!-- Form tìm kiếm nổi bật -->
+    <form action="{{ url_for('events') }}" method="get" class="event-list-search row justify-content-center g-2 mb-4">
+        <div class="col-md-6 col-lg-5">
+            <input type="text" name="search" class="form-control form-control-lg" placeholder="Tìm kiếm sự kiện..." value="{{ request.args.get('search', '') }}">
+        </div>
+        <div class="col-md-2 col-lg-2">
+            <button type="submit" class="btn btn-primary btn-lg w-100">
+                <i class="fas fa-search me-2"></i>Tìm kiếm
+            </button>
+        </div>
+    </form>
+
+    {% if events.items is defined %}
+        {% set event_list = events.items %}
+    {% else %}
+        {% set event_list = events %}
+    {% endif %}
+
+    {% if event_list|length == 0 %}
+        <div class="alert alert-warning text-center mt-4">
+            Không tìm thấy sự kiện phù hợp với từ khoá hoặc bộ lọc!
+        </div>
+    {% else %}
+        <div class="row g-4">
+            {% for event in event_list %}
+                <div class="col-lg-4 col-md-6">
+                    <div class="event-card h-100">
+                        {% if event.poster %}
+                            <img src="{{ event.poster }}" class="event-card-img" alt="{{ event.title }}">
+                        {% else %}
+                            <div class="event-card-img d-flex align-items-center justify-content-center text-muted">
+                                <i class="fas fa-image fa-2x"></i>
+                            </div>
+                        {% endif %}
+                        <div class="event-card-body">
+                            <div>
+                                <div class="event-card-title">{{ event.title }}</div>
+                                <div class="event-card-desc">{{ event.description[:100] }}...</div>
+                                <div class="event-card-meta">
+                                    <i class="fas fa-calendar-alt"></i> {{ event.start_time.strftime('%d/%m/%Y %H:%M') }}
+                                </div>
+                                <div class="event-card-meta">
+                                    <i class="fas fa-map-marker-alt"></i> {{ event.location }}
+                                </div>
+                            </div>
+                            <div class="event-card-footer">
+                                <span class="event-card-category">
+                                    {{ event.category.value.title() if event.category else 'N/A' }}
+                                </span>
+                                <a href="{{ url_for('event_detail', event_id=event.id) }}" class="event-card-btn">Xem chi tiết</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        <!-- Phân trang -->
+        <nav class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if events.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('events', page=events.prev_num, search=request.args.get('search', ''), category=request.args.get('category', ''), start_date=request.args.get('start_date', ''), end_date=request.args.get('end_date', ''), min_price=request.args.get('min_price', ''), max_price=request.args.get('max_price', '')) }}">Trước</a>
+                    </li>
+                {% endif %}
+                <li class="page-item disabled"><span class="page-link">Trang {{ events.page }} / {{ events.pages }}</span></li>
+                {% if events.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('events', page=events.next_num, search=request.args.get('search', ''), category=request.args.get('category', ''), start_date=request.args.get('start_date', ''), end_date=request.args.get('end_date', ''), min_price=request.args.get('min_price', ''), max_price=request.args.get('max_price', '')) }}">Tiếp</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .event-list-title {
+        color: #2c3e50;
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 15px;
+        text-align: center;
+    }
+    .event-card {
+        border-radius: 15px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
+        background: #fff;
+        overflow: hidden;
+        min-height: 420px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .event-card:hover {
+        transform: translateY(-5px) scale(1.02);
+        box-shadow: 0 12px 32px rgba(52,152,219,0.15);
+        border-color: #3498db;
+    }
+    .event-card-img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        border-top-left-radius: 15px;
+        border-top-right-radius: 15px;
+        background: #f8f9fa;
+    }
+    .event-card-body {
+        padding: 20px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .event-card-title {
+        color: #2980b9;
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    .event-card-desc {
+        color: #7f8c8d;
+        font-size: 0.95rem;
+        margin-bottom: 10px;
+        min-height: 48px;
+    }
+    .event-card-meta {
+        font-size: 0.92rem;
+        color: #34495e;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .event-card-meta i {
+        color: #3498db;
+        margin-right: 4px;
+    }
+    .event-card-footer {
+        margin-top: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .event-card-category {
+        font-size: 0.85rem;
+        padding: 4px 10px;
+        border-radius: 12px;
+        background: #eaf6fb;
+        color: #3498db;
+        font-weight: 600;
+        margin-right: 8px;
+    }
+    .event-card-btn {
+        background: linear-gradient(45deg, #3498db, #2980b9);
+        color: white;
+        border: none;
+        border-radius: 20px;
+        padding: 8px 22px;
+        font-weight: 600;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(52,152,219,0.15);
+    }
+    .event-card-btn:hover {
+        background: linear-gradient(45deg, #2980b9, #1f4e79);
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(52,152,219,0.18);
+    }
+    .event-list-search {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 18px 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 8px rgba(52,152,219,0.07);
+    }
+    @media (max-width: 768px) {
+        .event-list-title {
+            font-size: 1.3rem;
+        }
+        .event-card-img {
+            height: 140px;
+        }
+        .event-card-body {
+            padding: 12px;
+        }
+    }
+</style>
+{% endblock %}
