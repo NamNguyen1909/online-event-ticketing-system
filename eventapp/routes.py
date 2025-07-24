@@ -1,17 +1,13 @@
-from eventapp import app, db,login_manager
-from eventapp.models import DiscountCode, Event, PaymentMethod, TicketType, Review, User, EventCategory, Ticket, Payment, UserNotification, EventTrendingLog
-from flask import flash, jsonify, render_template, request, abort, session
-from sqlalchemy.orm import joinedload
-from datetime import datetime
-from flask import render_template, redirect, url_for
-from flask_login import login_required, current_user
-from flask import render_template, request, redirect, url_for, flash
+from eventapp import app, db, login_manager
+from eventapp.models import PaymentMethod
+from eventapp import dao
+from flask import flash, jsonify, render_template, request, abort, session, redirect, url_for
 from flask_login import login_required, current_user
 
 @app.route('/')
 def index():
     """Trang chủ"""
-    featured_events = Event.query.filter_by(is_active=True).limit(3).all()
+    featured_events = dao.get_featured_events()
     return render_template('index.html', events=featured_events)
 
 @app.route('/event/<int:event_id>')
@@ -20,10 +16,8 @@ def event_detail(event_id):
     try:
         print(f"Searching for event with ID: {event_id}")
         
-        # Load event với chỉ organizer
-        event = db.session.query(Event).options(
-            joinedload(Event.organizer)
-        ).filter_by(id=event_id, is_active=True).first()
+        # Load event với organizer
+        event = dao.get_event_detail(event_id)
         
         if not event:
             print(f"Event with ID {event_id} not found or not active")
@@ -32,88 +26,37 @@ def event_detail(event_id):
         print(f"Found event: {event.title}, Category: {event.category}")
         
         # Lấy các ticket types đang hoạt động
-        active_ticket_types = TicketType.query.filter_by(
-            event_id=event.id, 
-            is_active=True
-        ).all()
-        
+        active_ticket_types = dao.get_active_ticket_types(event.id)
         print(f"Found {len(active_ticket_types)} active ticket types")
         
-        # Lấy reviews với user
-        main_reviews = db.session.query(Review).options(
-            joinedload(Review.user)
-        ).filter_by(
-            event_id=event.id,
-            parent_review_id=None
-        ).order_by(Review.created_at.desc()).limit(5).all()
-        
+        # Lấy reviews
+        main_reviews = dao.get_event_reviews(event.id)
         print(f"Found {len(main_reviews)} reviews")
         
+        # Lấy tất cả reviews để tính rating
+        all_reviews = dao.get_all_event_reviews(event.id)
+        
         # Tính toán thống kê
-        total_tickets = sum(tt.total_quantity for tt in active_ticket_types) if active_ticket_types else 0
-        sold_tickets = sum(tt.sold_quantity for tt in active_ticket_types) if active_ticket_types else 0
-        available_tickets = total_tickets - sold_tickets
-        
-        # Tính revenue từ ticket_types
-        revenue = sum(tt.price * tt.sold_quantity for tt in active_ticket_types) if active_ticket_types else 0
-        
-        # Tính average rating
-        all_reviews = Review.query.filter_by(event_id=event.id, parent_review_id=None).all()
-        average_rating = sum(r.rating for r in all_reviews) / len(all_reviews) if all_reviews else 0
-        
-        stats = {
-            'total_tickets': total_tickets,
-            'sold_tickets': sold_tickets,
-            'available_tickets': available_tickets,
-            'revenue': revenue,
-            'average_rating': round(average_rating, 1) if average_rating else 0,
-            'review_count': len(all_reviews)
-        }
-        
+        stats = dao.calculate_event_stats(active_ticket_types, all_reviews)
         print(f"Stats calculated: {stats}")
-        print(f"Rendering template with event category: {event.category.value}")
         
-        # Kiểm tra quyền trả lời review dựa trên Flask-Login's current_user
+        # Kiểm tra quyền trả lời review
         can_reply = False
         if current_user.is_authenticated:
-            # Cho phép reply nếu user là staff hoặc organizer
             can_reply = current_user.role.value in ['staff', 'organizer']
         
-        # KHÔNG override current_user trong template context
         return render_template('customer/EventDetail.html', 
                              event=event, 
                              ticket_types=active_ticket_types,
                              reviews=main_reviews,
                              stats=stats,
-                             can_reply=can_reply)  # ✅ Loại bỏ current_user=current_user_obj
+                             can_reply=can_reply)
                              
     except Exception as e:
         print(f"Error in event_detail: {str(e)}")
         import traceback
         traceback.print_exc()
         abort(500)
-
-# Code cũ
-# @app.route('/events')
-# def events():
-#     """Danh sách sự kiện"""
-#     page = request.args.get('page', 1, type=int)
-#     category = request.args.get('category', '')
-#     search = request.args.get('search', '')
-    
-#     query = Event.query.filter_by(is_active=True)
-    
-#     if category:
-#         query = query.filter_by(category=category)
-    
-#     if search:
-#         query = query.filter(Event.title.contains(search))
-    
-#     events = query.order_by(Event.start_time.desc()).paginate(
-#         page=page, per_page=12, error_out=False
-#     )
-    
-#     return render_template('customer/EventList.html', events=events)
 
 @app.route('/events')
 def events():
@@ -126,80 +69,30 @@ def events():
     min_price = request.args.get('min_price', type=float)
     max_price = request.args.get('max_price', type=float)
 
-    query = Event.query.filter_by(is_active=True)
-
-    if category:
-        query = query.filter(Event.category == category)
-
-    if search:
-        query = query.filter(Event.title.ilike(f'%{search}%'))
-
-    if start_date:
-        try:
-            from datetime import datetime
-            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-            query = query.filter(Event.start_time >= start_dt)
-        except:
-            pass
-
-    if end_date:
-        try:
-            from datetime import datetime
-            end_dt = datetime.strptime(end_date, '%Y-%m-%d')
-            query = query.filter(Event.end_time <= end_dt)
-        except:
-            pass
-
-    # Lọc theo giá vé thấp nhất của event
-    if min_price is not None:
-        query = query.join(Event.ticket_types).filter(TicketType.price >= min_price)
-    if max_price is not None:
-        query = query.join(Event.ticket_types).filter(TicketType.price <= max_price)
-
-    events = query.order_by(Event.start_time.desc()).paginate(
-        page=page, per_page=12, error_out=False
-    )
-
+    events = dao.search_events(page, 12, category, search, start_date, end_date, min_price, max_price)
     return render_template('customer/EventList.html', events=events)
 
 @app.route('/trending')
 def trending():
     """Hiển thị sự kiện trending"""
-    try:
-        trending_events = Event.query.join(EventTrendingLog).order_by(EventTrendingLog.trending_score.desc()).limit(10).all()
-        return render_template('customer/EventList.html', events={'items': trending_events}, category_title='Sự Kiện Trending')
-    except Exception as e:
-        print(f"Error in trending: {e}")
-        events = Event.query.filter_by(is_active=True).order_by(Event.start_time.desc()).limit(10).all()
-        return render_template('customer/EventList.html', events={'items': events}, category_title='Sự Kiện Phổ Biến')
+    trending_events = dao.get_trending_events()
+    return render_template('customer/EventList.html', 
+                         events={'items': trending_events}, 
+                         category_title='Sự Kiện Trending')
 
 @app.route('/category/<category>')
 def category(category):
     """Hiển thị sự kiện theo danh mục"""
-    try:
-        category_enum = EventCategory[category.lower()]
-        events = Event.query.filter_by(category=category_enum, is_active=True).all()
-        
-        category_titles = {
-            'music': 'Âm Nhạc',
-            'sports': 'Thể Thao', 
-            'seminar': 'Hội Thảo',
-            'conference': 'Hội Nghị',
-            'festival': 'Lễ Hội',
-            'workshop': 'Workshop',
-            'party': 'Tiệc Party',
-            'competition': 'Cuộc Thi',
-            'other': 'Khác'
-        }
-        
-        category_title = category_titles.get(category.lower(), category.title())
-        
-        return render_template('customer/EventList.html', 
-                      events=events, 
-                      category=category,
-                      category_title=category_title)
-    except KeyError:
+    events = dao.get_events_by_category(category)
+    if events is None:
         abort(404)
+    
+    category_title = dao.get_category_title(category)
+    
+    return render_template('customer/EventList.html', 
+                  events=events, 
+                  category=category,
+                  category_title=category_title)
 
 @app.route('/support')
 def support():
@@ -237,19 +130,19 @@ def profile():
 @app.route('/my-tickets')
 @login_required
 def my_tickets():
-    tickets = Ticket.query.filter_by(user_id=current_user.id).all()
+    tickets = dao.get_user_tickets(current_user.id)
     return render_template('my_tickets.html', tickets=tickets)
 
 @app.route('/my-events')
 @login_required
 def my_events():
-    events = Event.query.filter_by(organizer_id=current_user.id).all()
+    events = dao.get_user_events(current_user.id)
     return render_template('my_events.html', events=events)
 
 @app.route('/orders')
 @login_required
 def orders():
-    payments = Payment.query.filter_by(user_id=current_user.id).all()
+    payments = dao.get_user_payments(current_user.id)
     return render_template('orders.html', payments=payments)
 
 @app.route('/settings')
@@ -260,15 +153,14 @@ def settings():
 @app.route('/notifications')
 @login_required
 def notifications():
-    notifications = UserNotification.query.filter_by(user_id=current_user.id).order_by(UserNotification.created_at.desc()).all()
+    notifications = dao.get_user_notifications(current_user.id)
     return render_template('notifications.html', notifications=notifications)
 
 @app.route('/debug/events')
 def debug_events():
     """Debug route để xem có events nào trong database"""
-    events = Event.query.all()
+    events = dao.get_all_events()
     return f"Có {len(events)} events trong database: {[e.id for e in events]}"
-
 
 # Routes cho Staff
 @app.route('/staff/scan')
@@ -364,8 +256,8 @@ def book_ticket(event_id):
     try:
         print(f"[BOOK_TICKET] User {current_user.username} accessing event {event_id}")
         
-        # Load event thông thường (không dùng joinedload cho ticket_types)
-        event = Event.query.filter_by(id=event_id, is_active=True).first()
+        # Load event
+        event = dao.get_event_for_booking(event_id)
         
         if not event:
             print(f"[BOOK_TICKET] Event {event_id} not found or not active")
@@ -374,14 +266,12 @@ def book_ticket(event_id):
         
         print(f"[BOOK_TICKET] Found event: {event.title}")
         
-        # Load ticket types riêng biệt
-        all_ticket_types = TicketType.query.filter_by(event_id=event_id).all()
+        # Load ticket types
+        all_ticket_types = dao.get_all_ticket_types_for_event(event_id)
         print(f"[BOOK_TICKET] Event has {len(all_ticket_types)} ticket types")
         
-        # Lấy các ticket types đang hoạt động và còn vé
-        available_ticket_types = [tt for tt in all_ticket_types 
-                                if tt.is_active and tt.sold_quantity < tt.total_quantity]
-        
+        # Lấy các ticket types khả dụng
+        available_ticket_types = dao.get_available_ticket_types(all_ticket_types)
         print(f"[BOOK_TICKET] Available ticket types: {len(available_ticket_types)}")
         
         if not available_ticket_types:
@@ -389,29 +279,13 @@ def book_ticket(event_id):
             flash('Sự kiện này hiện tại đã hết vé.', 'warning')
             return redirect(url_for('event_detail', event_id=event_id))
         
-        # Kiểm tra method get_user_group có tồn tại không
-        try:
-            user_group = current_user.get_customer_group()  
-            print(f"[BOOK_TICKET] User group: {user_group}")
-        except Exception as e:
-            print(f"[BOOK_TICKET] Error getting user group: {e}")
-            from eventapp.models import CustomerGroup
-            user_group = CustomerGroup.new  # Default group
+        # Lấy nhóm khách hàng
+        user_group = dao.get_user_customer_group(current_user)
+        print(f"[BOOK_TICKET] User group: {user_group}")
 
-        # Sửa query discount codes:
-        try:
-            current_time = datetime.now()
-            available_discounts = DiscountCode.query.filter(
-                DiscountCode.user_group == user_group,  # Sửa từ customer_group thành user_group
-                DiscountCode.is_active == True,
-                DiscountCode.valid_from <= current_time,
-                DiscountCode.valid_to >= current_time,
-                DiscountCode.used_count < DiscountCode.max_uses  # Sửa từ usage_count thành used_count và usage_limit thành max_uses
-            ).all()
-            print(f"[BOOK_TICKET] Found {len(available_discounts)} discount codes")
-        except Exception as e:
-            print(f"[BOOK_TICKET] Error loading discount codes: {e}")
-            available_discounts = []
+        # Lấy mã giảm giá
+        available_discounts = dao.get_user_discount_codes(user_group)
+        print(f"[BOOK_TICKET] Found {len(available_discounts)} discount codes")
         
         print(f"[BOOK_TICKET] Rendering BookTicket.html")
         return render_template('customer/BookTicket.html', 
@@ -455,10 +329,9 @@ def process_booking():
             return jsonify({'success': False, 'message': 'Vui lòng chọn ít nhất một vé.'})
         
         # Kiểm tra tồn kho
-        for ticket in data.get('tickets'):
-            ticket_type = TicketType.query.get(ticket['ticket_type_id'])
-            if not ticket_type or ticket['quantity'] > (ticket_type.total_quantity - ticket_type.sold_quantity):
-                return jsonify({'success': False, 'message': f'Không đủ vé loại {ticket_type.name if ticket_type else "Unknown"}'})
+        is_valid, error_message = dao.validate_ticket_availability(data.get('tickets'))
+        if not is_valid:
+            return jsonify({'success': False, 'message': error_message})
         
         return jsonify({'success': True, 'message': 'Đặt vé thành công! (Demo mode)'})
         
@@ -482,7 +355,6 @@ def debug_session():
     
     return f"<pre>{json.dumps(session_info, indent=2)}</pre>"
 
-# Thêm vào routes.py
 @app.route('/debug/full-session')
 def debug_full_session():
     """Debug session info chi tiết"""
