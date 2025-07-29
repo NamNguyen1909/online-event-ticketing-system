@@ -9,10 +9,12 @@ services:
     name: eventhub
     runtime: python
     buildCommand: |
+      cd eventapp
       pip install -r requirements.txt
       flask db init || true
       flask db migrate -m "Initial migration" || true
       flask db upgrade
+      cd ..
       python seed.py
     startCommand: python index.py
     envVars:
