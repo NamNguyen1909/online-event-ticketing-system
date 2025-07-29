@@ -39,4 +39,4 @@ services:
         sync: false
     plan: free
     healthCheckPath: /
-    autoDeploy: false
+    autoDeploy: true
