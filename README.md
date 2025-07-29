@@ -10,3 +10,27 @@ yêu cầu sau:
 - Yêu cầu 3: Thanh toán và nhận vé điện tử
 - Yêu cầu 4: Tạo và quản lý sự kiện
 - Yêu cầu 5: Theo dõi doanh thu và quét vé tại cổng
+
+
+
+
+#### Tạo migration script từ thay đổi model
+```
+flask db migrate -m "Initial migration"
+```
+
+#### Apply migration vào DB
+```
+flask db upgrade
+```
+
+
+# RUN
+```
+set FLASK_APP=app.py && set FLASK_ENV=development && flask run
+
+python index.py
+```
+
+
+http://127.0.0.1:5000/event/<id>

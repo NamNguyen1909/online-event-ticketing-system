@@ -1,0 +1,241 @@
+<!-- Footer -->
+<footer class="footer-section bg-dark text-light py-4">
+    <div class="container">
+        <!-- Main Footer Content -->
+        <div class="row align-items-center">
+            <!-- Company Info -->
+            <div class="col-lg-4 col-md-6 mb-3">
+                <div class="footer-brand mb-2">
+                    <h5 class="fw-bold">
+                        <i class="fas fa-ticket-alt text-warning me-2"></i>
+                        <span class="text-white">Event</span><span class="text-warning">Hub</span>
+                    </h5>
+                </div>
+                <p class="text-light mb-2 small">
+                    Hệ thống bán vé sự kiện trực tuyến hàng đầu Việt Nam
+                </p>
+                <!-- Social Links -->
+                <div class="social-links">
+                    <a href="#" class="text-light me-3" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+                    <a href="#" class="text-light me-3" title="Twitter"><i class="fab fa-twitter"></i></a>
+                    <a href="#" class="text-light me-3" title="Instagram"><i class="fab fa-instagram"></i></a>
+                    <a href="#" class="text-light" title="LinkedIn"><i class="fab fa-linkedin"></i></a>
+                </div>
+            </div>
+
+            <!-- Quick Links -->
+            <div class="col-lg-3 col-md-6 mb-3">
+                <h6 class="fw-bold mb-2 text-warning">Liên Kết</h6>
+                <div class="row">
+                    <div class="col-6">
+                        <ul class="list-unstyled small">
+                            <li class="mb-1"><a href="{{ url_for('index') }}" class="text-light text-decoration-none">Trang Chủ</a></li>
+                            <li class="mb-1"><a href="{{ url_for('events') }}" class="text-light text-decoration-none">Sự Kiện</a></li>
+                            <li class="mb-1"><a href="#" class="text-light text-decoration-none">Liên Hệ</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-6">
+                        <ul class="list-unstyled small">
+                            <li class="mb-1"><a href="#" class="text-light text-decoration-none">Trợ Giúp</a></li>
+                            <li class="mb-1"><a href="#" class="text-light text-decoration-none">Chính Sách</a></li>
+                            <li class="mb-1"><a href="#" class="text-light text-decoration-none">Bảo Mật</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact & Payment -->
+            <div class="col-lg-2 col-md-6 mb-3">
+                <h6 class="fw-bold mb-2 text-warning">Liên Hệ</h6>
+                <div class="small text-light">
+                    <div class="mb-1">
+                        <i class="fas fa-envelope me-2"></i>support@eventhub.vn
+                    </div>
+                    <div class="mb-2">
+                        <i class="fas fa-phone me-2"></i>+84 123 456 789
+                    </div>
+                    <!-- Payment Methods -->
+                    <div class="payment-methods">
+                        <img src="https://via.placeholder.com/35x20/E91E63/FFFFFF?text=MOMO" alt="MoMo" class="me-1 rounded" style="height: 20px;">
+                        <img src="https://via.placeholder.com/35x20/2196F3/FFFFFF?text=VNPAY" alt="VNPay" class="me-1 rounded" style="height: 20px;">
+                        <img src="https://via.placeholder.com/35x20/4CAF50/FFFFFF?text=VISA" alt="Visa" class="rounded" style="height: 20px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dev Team -->
+            <div class="col-lg-3 col-md-6">
+                <h6 class="fw-bold mb-2 text-warning">
+                    <i class="fas fa-code me-2"></i>Team Phát Triển
+                </h6>
+                <div class="team-members">
+                    <div class="mb-1">
+                        <a href="https://github.com/NamNguyen1909" target="_blank" 
+                           class="text-light text-decoration-none small d-block team-member">
+                            <i class="fab fa-github me-2"></i>Nam Nguyen
+                        </a>
+                    </div>
+                    <div class="mb-1">
+                        <a href="https://github.com/FongFus" target="_blank" 
+                           class="text-light text-decoration-none small d-block team-member">
+                            <i class="fab fa-github me-2"></i>Fong Fus
+                        </a>
+                    </div>
+                    <div class="mb-1">
+                        <a href="https://github.com/HwPhuc" target="_blank" 
+                           class="text-light text-decoration-none small d-block team-member">
+                            <i class="fab fa-github me-2"></i>Hw Phuc
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <hr class="border-secondary my-3">
+
+        <!-- Copyright -->
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <p class="text-light mb-0 small">
+                    &copy; 2025 EventHub. Tất cả quyền được bảo lưu.
+                </p>
+            </div>
+            <div class="col-md-6 text-md-end">
+                <p class="text-light mb-0 small">
+                    Phát triển với <i class="fas fa-heart text-danger"></i> bởi Team EventHub
+                </p>
+            </div>
+        </div>
+
+        <!-- Back to Top Button -->
+        <div class="back-to-top position-fixed bottom-0 end-0 m-4" style="z-index: 1000;">
+            <button class="btn btn-warning btn-sm rounded-circle p-2" id="backToTopBtn" title="Về đầu trang">
+                <i class="fas fa-chevron-up"></i>
+            </button>
+        </div>
+    </div>
+</footer>
+
+<!-- CSS cho Footer -->
+<style>
+.footer-section .team-member:hover {
+    color: #ffc107 !important;
+    transition: color 0.3s ease;
+}
+
+.footer-section .social-links a:hover {
+    color: #ffc107 !important;
+    transition: color 0.3s ease;
+}
+
+.footer-section .text-light a:hover {
+    color: #ffc107 !important;
+    transition: color 0.3s ease;
+}
+
+.payment-methods img {
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+.payment-methods img:hover {
+    opacity: 1;
+}
+
+.back-to-top button {
+    box-shadow: 0 2px 10px rgba(255, 193, 7, 0.3);
+    display: none; /* Ẩn mặc định */
+}
+
+.back-to-top button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.5);
+    transition: all 0.3s ease;
+}
+
+.back-to-top button.show {
+    display: inline-block !important;
+    animation: fadeInUp 0.3s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .footer-section {
+        text-align: center;
+    }
+    
+    .footer-section .col-md-6 {
+        text-align: center !important;
+        margin-bottom: 10px;
+    }
+    
+    .team-members {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 15px;
+    }
+    
+    .team-members .mb-1 {
+        margin-bottom: 0 !important;
+    }
+    
+    .back-to-top {
+        bottom: 20px !important;
+        right: 20px !important;
+    }
+}
+</style>
+
+<!-- JavaScript cho Footer -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const backToTopBtn = document.getElementById('backToTopBtn');
+    
+    // Hiển thị/ẩn nút back to top khi scroll
+    window.addEventListener('scroll', function() {
+        if (window.pageYOffset > 300) {
+            backToTopBtn.classList.add('show');
+            backToTopBtn.style.display = 'inline-block';
+        } else {
+            backToTopBtn.classList.remove('show');
+            // Delay để animation chạy xong
+            setTimeout(() => {
+                if (!backToTopBtn.classList.contains('show')) {
+                    backToTopBtn.style.display = 'none';
+                }
+            }, 300);
+        }
+    });
+    
+    // Function scroll to top
+    function scrollToTop() {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    }
+    
+    // Event listener cho nút back to top
+    backToTopBtn.addEventListener('click', scrollToTop);
+    
+    // Optional: Keyboard accessibility
+    backToTopBtn.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            scrollToTop();
+        }
+    });
+});
+</script>

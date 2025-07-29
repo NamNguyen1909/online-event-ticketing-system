@@ -1,0 +1,416 @@
+<!-- Header Navigation -->
+<header class="header-section">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top shadow">
+        <div class="container">
+            <!-- Brand Logo -->
+            <a class="navbar-brand fw-bold fs-3" href="{{ url_for('index') }}">
+                <i class="fas fa-ticket-alt text-warning me-2"></i>
+                <span class="text-white">Event</span><span class="text-warning">Hub</span>
+            </a>
+
+            <!-- Mobile Menu Toggle -->
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <!-- Navigation Menu -->
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <!-- Menu cho tất cả người dùng (chưa đăng nhập) -->
+                    {% if not current_user or not current_user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('index') }}">
+                                <i class="fas fa-home me-1"></i>Trang Chủ
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('events') }}">
+                                <i class="fas fa-calendar-alt me-1"></i>Sự Kiện
+                            </a>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="categoriesDropdown" role="button" 
+                               data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-list me-1"></i>Danh Mục
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('category', category='music') }}"><i class="fas fa-music me-2"></i>Âm Nhạc</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('category', category='sports') }}"><i class="fas fa-futbol me-2"></i>Thể Thao</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('category', category='seminar') }}"><i class="fas fa-chalkboard-teacher me-2"></i>Hội Thảo</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('category', category='conference') }}"><i class="fas fa-users me-2"></i>Hội Nghị</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('category', category='festival') }}"><i class="fas fa-star me-2"></i>Lễ Hội</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('events') }}"><i class="fas fa-th me-2"></i>Tất Cả</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('trending') }}">
+                                <i class="fas fa-fire text-danger me-1"></i>Trending
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    <!-- Menu cho Customer -->
+                    {% if current_user and current_user.is_authenticated and current_user.role.value == 'customer' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('index') }}">
+                                <i class="fas fa-home me-1"></i>Trang Chủ
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('events') }}">
+                                <i class="fas fa-calendar-alt me-1"></i>Sự Kiện
+                            </a>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="categoriesDropdown" role="button" 
+                               data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-list me-1"></i>Danh Mục
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('category', category='music') }}"><i class="fas fa-music me-2"></i>Âm Nhạc</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('category', category='sports') }}"><i class="fas fa-futbol me-2"></i>Thể Thao</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('category', category='seminar') }}"><i class="fas fa-chalkboard-teacher me-2"></i>Hội Thảo</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('category', category='conference') }}"><i class="fas fa-users me-2"></i>Hội Nghị</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('category', category='festival') }}"><i class="fas fa-star me-2"></i>Lễ Hội</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('events') }}"><i class="fas fa-th me-2"></i>Tất Cả</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('my_tickets') }}">
+                                <i class="fas fa-ticket-alt me-1"></i>Vé Của Tôi
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('orders') }}">
+                                <i class="fas fa-credit-card me-1"></i>Thanh Toán
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    <!-- Menu cho Staff -->
+                    {% if current_user and current_user.is_authenticated and current_user.role.value == 'staff' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('staff_scan') }}">
+                                <i class="fas fa-qrcode me-1"></i>Quét Vé
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    <!-- Menu cho Organizer -->
+                    {% if current_user and current_user.is_authenticated and current_user.role.value == 'organizer' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('organizer_dashboard') }}">
+                                <i class="fas fa-chart-bar me-1"></i>Thống Kê
+                            </a>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="eventManagementDropdown" role="button" 
+                               data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-calendar-plus me-1"></i>Quản Lý Sự Kiện
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('create_event') }}"><i class="fas fa-plus me-2"></i>Tạo Sự Kiện</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('my_events') }}"><i class="fas fa-calendar me-2"></i>Sự Kiện Của Tôi</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('event_analytics') }}"><i class="fas fa-chart-line me-2"></i>Phân Tích Sự Kiện</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="staffManagementDropdown" role="button" 
+                               data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-users-cog me-1"></i>Quản Lý Nhân Viên
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('manage_staff') }}"><i class="fas fa-users me-2"></i>Danh Sách Nhân Viên</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('add_staff') }}"><i class="fas fa-user-plus me-2"></i>Thêm Nhân Viên</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('staff_permissions') }}"><i class="fas fa-key me-2"></i>Phân Quyền</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('revenue_reports') }}">
+                                <i class="fas fa-money-bill-wave me-1"></i>Báo Cáo Doanh Thu
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    <!-- Menu cho Admin -->
+                    {% if current_user and current_user.is_authenticated and current_user.role.value == 'admin' %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" 
+                               data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-cogs me-1"></i>Quản Trị Hệ Thống
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('admin_dashboard') }}"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('user_management') }}"><i class="fas fa-users me-2"></i>Quản Lý Người Dùng</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('event_moderation') }}"><i class="fas fa-eye me-2"></i>Kiểm Duyệt Sự Kiện</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('system_settings') }}"><i class="fas fa-cog me-2"></i>Cài Đặt Hệ Thống</a></li>
+                            </ul>
+                        </li>
+                    {% endif %}
+                </ul>
+
+                <!-- Thanh tìm kiếm sự kiện (desktop) -->
+                <form class="d-none d-lg-flex me-3" action="{{ url_for('events') }}" method="get" role="search">
+                    <div class="input-group">
+                        <input type="text" name="search" class="form-control" placeholder="Tìm kiếm sự kiện..." aria-label="Tìm kiếm sự kiện">
+                        <button class="btn btn-outline-light" type="submit">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- User Actions -->
+                <ul class="navbar-nav">
+                    <!-- Cart/Tickets - Chỉ hiện cho customer -->
+                    {% if current_user and current_user.is_authenticated and current_user.role.value == 'customer' %}
+                    <li class="nav-item">
+                        <a class="nav-link position-relative" href="{{ url_for('my_tickets') }}">
+                            <i class="fas fa-shopping-cart"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="cart-badge">
+                                0
+                                <span class="visually-hidden">items in cart</span>
+                            </span>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <!-- Notifications - Hiện cho tất cả user đã đăng nhập -->
+                    {% if current_user and current_user.is_authenticated %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link position-relative" href="#" id="notificationsDropdown" role="button" 
+                           data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-bell"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning d-none" id="notification-badge">
+                                0
+                                <span class="visually-hidden">unread notifications</span>
+                            </span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end notification-dropdown">
+                            <li class="dropdown-header">
+                                <strong>Thông Báo</strong>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <div class="dropdown-item-text text-center text-muted">
+                                    <i class="fas fa-inbox fa-2x mb-2"></i>
+                                    <div>Chưa có thông báo mới</div>
+                                </div>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-center" href="{{ url_for('notifications') }}">Xem tất cả</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+
+                    <!-- User Profile -->
+                    <li class="nav-item dropdown">
+                        {% if current_user and current_user.is_authenticated %}
+                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" 
+                               role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <img src="{{ current_user.avatar_url or 'https://via.placeholder.com/32x32' }}" alt="Avatar" 
+                                     class="rounded-circle me-2" width="32" height="32">
+                                <span class="d-none d-md-inline">{{ current_user.username }}</span>
+                                <span class="badge bg-secondary ms-1 d-none d-lg-inline">{{ current_user.role.value.title() }}</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li class="dropdown-header">
+                                    <strong>{{ current_user.username }}</strong>
+                                    <div class="text-muted small">{{ current_user.role.value.title() }}</div>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                
+                                <!-- Profile cho tất cả role -->
+                                <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user me-2"></i>Hồ Sơ</a></li>
+                                
+                                <!-- Menu riêng cho từng role -->
+                                {% if current_user.role.value == 'customer' %}
+                                    <li><a class="dropdown-item" href="{{ url_for('my_tickets') }}"><i class="fas fa-ticket-alt me-2"></i>Vé Của Tôi</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('orders') }}"><i class="fas fa-shopping-bag me-2"></i>Đơn Hàng</a></li>
+                                {% elif current_user.role.value == 'organizer' %}
+                                    <li><a class="dropdown-item" href="{{ url_for('organizer_dashboard') }}"><i class="fas fa-chart-bar me-2"></i>Dashboard</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('my_events') }}"><i class="fas fa-calendar me-2"></i>Sự Kiện Của Tôi</a></li>
+                                {% elif current_user.role.value == 'staff' %}
+                                    <li><a class="dropdown-item" href="{{ url_for('staff_scan') }}"><i class="fas fa-qrcode me-2"></i>Quét Vé</a></li>
+                                {% elif current_user.role.value == 'admin' %}
+                                    <li><a class="dropdown-item" href="{{ url_for('admin_dashboard') }}"><i class="fas fa-tachometer-alt me-2"></i>Admin Dashboard</a></li>
+                                {% endif %}
+                                
+                                <li><a class="dropdown-item" href="{{ url_for('settings') }}"><i class="fas fa-cog me-2"></i>Cài Đặt</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal">
+                                    <i class="fas fa-sign-out-alt me-2"></i>Đăng Xuất
+                                </a></li>
+                            </ul>
+                        {% else %}
+                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" 
+                               role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <img src="https://via.placeholder.com/32x32/6c757d/ffffff?text=?" alt="Avatar" 
+                                     class="rounded-circle me-2" width="32" height="32">
+                                <span class="d-none d-md-inline">Khách</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="{{ url_for('auth.login') }}">
+                                    <i class="fas fa-sign-in-alt me-2"></i>Đăng Nhập
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('auth.register') }}">
+                                    <i class="fas fa-user-plus me-2"></i>Đăng Ký
+                                </a></li>
+                            </ul>
+                        {% endif %}
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mobile Search Bar - Hiện dưới navbar cho mobile -->
+    {% if not current_user or not current_user.is_authenticated or current_user.role.value == 'customer' %}
+    <div class="container d-lg-none py-2">
+        <form action="{{ url_for('events') }}" method="get" role="search">
+            <div class="input-group">
+                <input class="form-control" type="search" name="search" placeholder="Tìm kiếm sự kiện..." aria-label="Search">
+                <button class="btn btn-outline-primary" type="submit">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Logout Confirmation Modal -->
+    {% if current_user and current_user.is_authenticated %}
+    <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="logoutModalLabel">
+                        <i class="fas fa-sign-out-alt me-2"></i>Xác nhận đăng xuất
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Bạn có chắc chắn muốn đăng xuất?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <form method="POST" action="{{ url_for('auth.logout') }}" class="d-inline">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-sign-out-alt me-2"></i>Đăng Xuất
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</header>
+
+<!-- Custom CSS for enhanced responsive design -->
+<style>
+/* Role-based styling */
+.badge {
+    font-size: 0.7em;
+}
+
+/* Mobile menu improvements */
+@media (max-width: 991.98px) {
+    .navbar-nav {
+        text-align: center;
+    }
+    
+    .navbar-nav .nav-item {
+        margin: 0.25rem 0;
+    }
+    
+    .dropdown-menu {
+        width: 100%;
+        border: none;
+        box-shadow: none;
+        background-color: rgba(255, 255, 255, 0.95);
+    }
+    
+    .navbar-collapse {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+}
+
+/* Notification dropdown improvements */
+.notification-dropdown {
+    width: 320px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.notification-dropdown .dropdown-item {
+    white-space: normal;
+    padding: 0.75rem 1rem;
+}
+
+/* Avatar hover effect */
+.nav-link img {
+    transition: transform 0.2s ease;
+}
+
+.nav-link:hover img {
+    transform: scale(1.1);
+}
+
+/* Badge positioning */
+.position-relative .badge {
+    font-size: 0.6rem;
+    min-width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Responsive search bar */
+.input-group {
+    max-width: 300px;
+}
+
+@media (max-width: 575.98px) {
+    .input-group {
+        max-width: 100%;
+    }
+}
+
+/* Dropdown menu improvements */
+.dropdown-menu {
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border-radius: 0.5rem;
+}
+
+.dropdown-item {
+    padding: 0.5rem 1rem;
+    transition: background-color 0.15s ease-in-out;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+    transform: translateX(2px);
+}
+
+/* Role-specific menu styling */
+.nav-item[data-role="admin"] .nav-link {
+    border-left: 3px solid #dc3545;
+}
+
+.nav-item[data-role="organizer"] .nav-link {
+    border-left: 3px solid #fd7e14;
+}
+
+.nav-item[data-role="staff"] .nav-link {
+    border-left: 3px solid #20c997;
+}
+
+.nav-item[data-role="customer"] .nav-link {
+    border-left: 3px solid #0d6efd;
+}
+</style>
