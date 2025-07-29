@@ -12,12 +12,12 @@ services:
       cd eventapp
       pip install -r requirements.txt
       export FLASK_APP=eventapp
-      flask db init || true
-      flask db migrate -m "Initial migration" || true
       flask db upgrade
-      cd ..
+      flask db migrate -m "Auto migration" || true
+      flask db upgrade
+      # cd ..
       # python seed.py
-    startCommand: python eventapp/index.py
+    startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT eventapp.index:app
     envVars:
       - key: DATABASE_URL
         fromDatabase:
