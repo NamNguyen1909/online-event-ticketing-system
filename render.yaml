@@ -9,7 +9,7 @@ services:
     name: eventhub
     runtime: python
     buildCommand: |
-      cd eventapp
+      # cd eventapp
       pip install -r requirements.txt
       export FLASK_APP=eventapp
       flask db upgrade
@@ -17,7 +17,7 @@ services:
       flask db upgrade
       # cd ..
       # python seed.py
-    startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT eventapp.index:app
+    startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT eventapp:app
     envVars:
       - key: DATABASE_URL
         fromDatabase:
