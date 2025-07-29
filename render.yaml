@@ -7,7 +7,7 @@ databases:
 services:
   - type: web
     name: eventhub
-    runtime: python3
+    runtime: python
     buildCommand: |
       pip install -r requirements.txt
       flask db init || true
@@ -27,11 +27,11 @@ services:
       - key: FLASK_APP
         value: index.py
       - key: CLOUDINARY_CLOUD_NAME
-        value: os.getenv('CLOUDINARY_CLOUD_NAME', 'your_cloudinary_cloud_name')
+        sync: false  # Render sẽ lấy từ Environment Variables đã set sẵn
       - key: CLOUDINARY_API_KEY
-        value: os.getenv('CLOUDINARY_API_KEY', 'your_cloudinary_api_key')
+        sync: false
       - key: CLOUDINARY_API_SECRET
-        value: os.getenv('CLOUDINARY_API_SECRET', 'your_cloudinary_api_secret')
+        sync: false
     plan: free
     healthCheckPath: /
     autoDeploy: false
