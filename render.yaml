@@ -11,12 +11,13 @@ services:
     buildCommand: |
       cd eventapp
       pip install -r requirements.txt
+      export FLASK_APP=eventapp
       flask db init || true
       flask db migrate -m "Initial migration" || true
       flask db upgrade
       cd ..
       python seed.py
-    startCommand: python index.py
+    startCommand: python eventapp/index.py
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -29,7 +30,7 @@ services:
       - key: FLASK_APP
         value: eventapp
       - key: CLOUDINARY_CLOUD_NAME
-        sync: false  # Render sẽ lấy từ Environment Variables đã set sẵn
+        sync: false
       - key: CLOUDINARY_API_KEY
         sync: false
       - key: CLOUDINARY_API_SECRET
