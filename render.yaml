@@ -13,10 +13,10 @@ services:
       pip install -r requirements.txt
       cd ..
       export FLASK_APP=eventapp
-      cd eventapp
-      flask db upgrade
-      flask db migrate -m "Auto migration" || true
-      flask db upgrade
+      # cd eventapp
+      # flask db upgrade
+      # flask db migrate -m "Auto migration" || true
+      # flask db upgrade
       # cd ..
       # python seed.py
     startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT eventapp:app
