@@ -27,7 +27,7 @@ services:
       - key: FLASK_ENV
         value: production
       - key: FLASK_APP
-        value: index.py
+        value: eventapp
       - key: CLOUDINARY_CLOUD_NAME
         sync: false  # Render sẽ lấy từ Environment Variables đã set sẵn
       - key: CLOUDINARY_API_KEY
