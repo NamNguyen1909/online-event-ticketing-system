@@ -13,6 +13,7 @@ services:
       pip install -r requirements.txt
       cd ..
       export FLASK_APP=eventapp
+      cd eventapp
       flask db upgrade
       flask db migrate -m "Auto migration" || true
       flask db upgrade
