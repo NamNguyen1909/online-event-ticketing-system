@@ -1,0 +1,438 @@
+{% extends 'layout/base.html' %}
+
+{% block title %}EventHub - Quản Lý Nhân Viên{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<style>
+    .tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .tab {
+        padding: 0.75rem 1.5rem;
+        cursor: pointer;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-bottom: none;
+        border-radius: 5px 5px 0 0;
+        transition: all 0.3s ease;
+    }
+    .tab.active {
+        background: #fff;
+        font-weight: 500;
+        border-bottom: 2px solid #007bff;
+    }
+    .tab-content {
+        border: 1px solid #dee2e6;
+        padding: 1.5rem;
+        border-radius: 0 0 5px 5px;
+        background: #fff;
+    }
+    .table th, .table td {
+        vertical-align: middle;
+    }
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    .form-group label {
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 0.5rem;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+    }
+    .form-group textarea {
+        resize: vertical;
+        min-height: 100px;
+    }
+    .flex {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .half {
+        flex: 1;
+        min-width: 200px;
+    }
+    .buttons {
+        margin-top: 1.5rem;
+        display: flex;
+        gap: 0.75rem;
+    }
+    .no-staff {
+        text-align: center;
+        padding: 2rem;
+        color: #666;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="main-content container">
+    <section class="py-4">
+        <h2>Quản Lý Nhân Viên</h2>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" data-tab="create">Tạo nhân viên</div>
+            <div class="tab" data-tab="list">Danh sách nhân viên</div>
+            <div class="tab" data-tab="edit">Chỉnh sửa nhân viên</div>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- Tạo nhân viên -->
+            <div id="create" class="tab-pane active">
+                <h3>Tạo nhân viên</h3>
+                <form id="createStaffForm" method="POST" enctype="multipart/form-data" action="{{ url_for('organizer_create_staff') }}">
+                    <div class="form-group">
+                        <label for="create-username">Tên đăng nhập</label>
+                        <input type="text" id="create-username" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="create-email">Email</label>
+                        <input type="email" id="create-email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="create-phone">Số điện thoại</label>
+                        <input type="text" id="create-phone" name="phone">
+                    </div>
+                    <div class="form-group">
+                        <label for="create-password">Mật khẩu</label>
+                        <input type="password" id="create-password" name="password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="create-avatar">Tải avatar</label>
+                        <input type="file" id="create-avatar" name="avatar" accept="image/*">
+                    </div>
+                    <div class="buttons">
+                        <button type="submit" class="btn btn-primary">Tạo nhân viên</button>
+                        <button type="reset" class="btn btn-secondary">Xóa thông tin</button>
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">Thoát</a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Danh sách nhân viên -->
+            <div id="list" class="tab-pane" style="display: none;">
+                {% if staff_members.items %}
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th scope="col" style="width: 5%;"><input type="checkbox" id="select-all"></th>
+                                <th scope="col">ID</th>
+                                <th scope="col">Tên đăng nhập</th>
+                                <th scope="col">Email</th>
+                                <th scope="col">Số điện thoại</th>
+                                <th scope="col">Trạng thái</th>
+                                <th scope="col">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for staff in staff_members.items %}
+                                <tr>
+                                    <td><input type="checkbox" class="staff-checkbox" data-staff-id="{{ staff.id }}"></td>
+                                    <td>{{ staff.id }}</td>
+                                    <td>{{ staff.username }}</td>
+                                    <td>{{ staff.email }}</td>
+                                    <td>{{ staff.phone or 'N/A' }}</td>
+                                    <td>{{ 'Đang hoạt động' if staff.is_active else 'Không hoạt động' }}</td>
+                                    <td>
+                                        <button class="btn btn-outline-secondary btn-sm edit-staff" data-staff-id="{{ staff.id }}">
+                                            <i class="fas fa-edit"></i> Sửa
+                                        </button>
+                                        <button class="btn btn-danger btn-sm" onclick="confirmDelete('{{ staff.id }}')">                                            <i class="fas fa-trash"></i> Xóa
+                                        </button>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                    <div class="buttons">
+                        <a href="#" class="btn btn-primary" onclick="document.querySelector('.tab[data-tab=\'create\']').click()">Thêm</a>
+                        <button class="btn btn-secondary" id="bulk-edit" disabled>Sửa</button>
+                        <button class="btn btn-danger" id="bulk-delete" disabled>Xóa</button>
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">Thoát</a>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if staff_members.has_prev or staff_members.has_next %}
+                        <nav aria-label="Page navigation" class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                {% if staff_members.has_prev %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('organizer_manage_staff', page=staff_members.prev_num) }}">Trước</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <a class="page-link">Trước</a>
+                                    </li>
+                                {% endif %}
+                                
+                                {% for page_num in staff_members.iter_pages() %}
+                                    {% if page_num %}
+                                        <li class="page-item {{ 'active' if page_num == staff_members.page else '' }}">
+                                            <a class="page-link" href="{{ url_for('organizer_manage_staff', page=page_num) }}">{{ page_num }}</a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if staff_members.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('organizer_manage_staff', page=staff_members.next_num) }}">Sau</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <a class="page-link">Sau</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="no-staff">
+                        <h4>Chưa có nhân viên nào</h4>
+                        <p>Bắt đầu bằng cách tạo nhân viên mới!</p>
+                        <a href="#" class="btn btn-primary" onclick="document.querySelector('.tab[data-tab=\'create\']').click()">Tạo Nhân Viên</a>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Chỉnh sửa nhân viên -->
+            <div id="edit" class="tab-pane" style="display: none;">
+                <h3>Chỉnh sửa nhân viên</h3>
+                <form id="editStaffForm" method="POST" enctype="multipart/form-data" action="">
+                    <input type="hidden" id="edit-staff-id" name="staff_id">
+                    <div class="form-group">
+                        <label for="edit-username">Tên đăng nhập</label>
+                        <input type="text" id="edit-username" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-email">Email</label>
+                        <input type="email" id="edit-email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-phone">Số điện thoại</label>
+                        <input type="text" id="edit-phone" name="phone">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-password">Mật khẩu mới (để trống nếu không đổi)</label>
+                        <input type="password" id="edit-password" name="password">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-avatar">Tải avatar mới</label>
+                        <input type="file" id="edit-avatar" name="avatar" accept="image/*">
+                    </div>
+                    <div class="buttons">
+                        <button type="submit" class="btn btn-primary">Cập nhật</button>
+                        <button type="button" class="btn btn-danger" id="delete-staff-btn">Xóa nhân viên</button>
+                        <a href="{{ url_for('organizer_manage_staff') }}" class="btn btn-outline-secondary">Thoát</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteStaffModal" tabindex="-1" aria-labelledby="deleteStaffModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteStaffModalLabel">Xác nhận xóa nhân viên</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Bạn có chắc chắn muốn xóa nhân viên này? Hành động này không thể hoàn tác.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Xóa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
+<script>
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+            
+            this.classList.add('active');
+            document.getElementById(this.dataset.tab).style.display = 'block';
+            
+            if (this.dataset.tab === 'edit' || this.dataset.tab === 'create') {
+                document.getElementById('editStaffForm').reset();
+                document.getElementById('edit-staff-id').value = '';
+                document.getElementById('createStaffForm').reset();
+            }
+        });
+    });
+
+    // Select all checkboxes
+    document.getElementById('select-all').addEventListener('change', function() {
+        document.querySelectorAll('.staff-checkbox').forEach(cb => {
+            cb.checked = this.checked;
+        });
+        updateBulkButtons();
+    });
+
+    // Individual checkbox change
+    document.querySelectorAll('.staff-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateBulkButtons);
+    });
+
+    // Update bulk action buttons state
+    function updateBulkButtons() {
+        const checkedBoxes = document.querySelectorAll('.staff-checkbox:checked');
+        const bulkEditBtn = document.getElementById('bulk-edit');
+        const bulkDeleteBtn = document.getElementById('bulk-delete');
+        
+        bulkEditBtn.disabled = checkedBoxes.length !== 1;
+        bulkDeleteBtn.disabled = checkedBoxes.length === 0;
+    }
+
+    // Load staff data for editing
+    document.querySelectorAll('.edit-staff').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const staffId = this.dataset.staffId;
+            fetch('/api/staff/' + staffId)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('edit-staff-id').value = staffId;
+                        document.getElementById('edit-username').value = data.staff.username;
+                        document.getElementById('edit-email').value = data.staff.email;
+                        document.getElementById('edit-phone').value = data.staff.phone || '';
+                        document.getElementById('edit-password').value = '';
+
+                        // Switch to edit tab
+                        document.querySelector('.tab[data-tab="edit"]').click();
+                    } else {
+                        window.EventHub.showAlert(data.message || 'Lỗi khi tải dữ liệu nhân viên', 'danger');
+                    }
+                })
+                .catch(error => {
+                    window.EventHub.showAlert('Lỗi khi tải dữ liệu nhân viên: ' + error.message, 'danger');
+                });
+        });
+    });
+
+    // Delete confirmation
+    function confirmDelete(staffId) {
+        const modal = new bootstrap.Modal(document.getElementById('deleteStaffModal'));
+        const confirmBtn = document.getElementById('confirmDeleteBtn');
+        
+        confirmBtn.onclick = function() {
+            fetch('/organizer/delete-staff/' + staffId, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.EventHub.showAlert('Xóa nhân viên thành công!', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    window.EventHub.showAlert(data.message || 'Lỗi khi xóa nhân viên', 'danger');
+                }
+                modal.hide();
+            })
+            .catch(error => {
+                window.EventHub.showAlert('Lỗi khi xóa nhân viên: ' + error.message, 'danger');
+                modal.hide();
+            });
+        };
+        
+        modal.show();
+    }
+
+    // Bulk delete
+    document.getElementById('bulk-delete').addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.staff-checkbox:checked');
+        const staffIds = Array.from(checkedBoxes).map(cb => cb.dataset.staffId);
+        
+        if (staffIds.length > 0) {
+            const modal = new bootstrap.Modal(document.getElementById('deleteStaffModal'));
+            const confirmBtn = document.getElementById('confirmDeleteBtn');
+            
+            confirmBtn.onclick = function() {
+                fetch('/organizer/bulk-delete-staff', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ staff_ids: staffIds })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.EventHub.showAlert('Xóa các nhân viên thành công!', 'success');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        window.EventHub.showAlert(data.message || 'Lỗi khi xóa nhân viên', 'danger');
+                    }
+                    modal.hide();
+                })
+                .catch(error => {
+                    window.EventHub.showAlert('Lỗi khi xóa nhân viên: ' + error.message, 'danger');
+                    modal.hide();
+                });
+            };
+            
+            modal.show();
+        }
+    });
+
+    // Form submission
+    document.getElementById('createStaffForm').addEventListener('submit', function(e) {
+        if (!window.EventHub.validateForm(this)) {
+            e.preventDefault();
+            window.EventHub.showAlert('Vui lòng điền đầy đủ thông tin bắt buộc', 'danger');
+        } else {
+            window.EventHub.showLoading();
+        }
+    });
+
+    document.getElementById('editStaffForm').addEventListener('submit', function(e) {
+        if (!window.EventHub.validateForm(this)) {
+            e.preventDefault();
+            window.EventHub.showAlert('Vui lòng điền đầy đủ thông tin bắt buộc', 'danger');
+        } else {
+            window.EventHub.showLoading();
+        }
+    });
+
+    // Delete staff from edit tab
+    document.getElementById('delete-staff-btn').addEventListener('click', function() {
+        const staffId = document.getElementById('edit-staff-id').value;
+        if (staffId) {
+            confirmDelete(staffId);
+        } else {
+            window.EventHub.showAlert('Vui lòng chọn nhân viên để xóa', 'warning');
+        }
+    });
+</script>
+{% endblock %}
