@@ -1,131 +1,100 @@
-{% extends 'layout/base.html' %}
-
-{% block title %}EventHub - Tạo Sự Kiện{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-<style>
-    .form-group {
-        margin-bottom: 1rem;
-    }
-    .form-group label {
-        font-weight: 500;
-        margin-bottom: 0.5rem;
-    }
-    .form-group input,
-    .form-group select,
-    .form-group textarea {
-        width: 100%;
-        padding: 0.5rem;
-        border-radius: 5px;
-        border: 1px solid #ccc;
-    }
-    .form-group textarea {
-        resize: vertical;
-        min-height: 100px;
-    }
-    .row {
-        display: flex;
-        gap: 1rem;
-        flex-wrap: wrap;
-    }
-    .row .column {
-        flex: 1;
-        min-width: 200px;
-    }
-    .buttons {
-        margin-top: 1.5rem;
-        display: flex;
-        gap: 1rem;
-    }
-</style>
-{% endblock %}
-
-{% block content %}
-<div class="main-content container">
-    <section class="py-4">
-        <h2>Tạo Sự Kiện</h2>
-        <form id="createEventForm" method="POST" enctype="multipart/form-data" action="{{ url_for('organizer_create_event') }}">
-            <div class="form-group">
-                <label for="event-name">Tên sự kiện</label>
-                <input type="text" id="event-name" name="title" required>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tạo Sự Kiện - EventHub</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    {% extends 'layout/base.html' %}
+    {% block title %}Tạo Sự Kiện - EventHub{% endblock %}
+    {% block content %}
+    <div class="container">
+        <h1>Tạo Sự Kiện Mới</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <form method="post" enctype="multipart/form-data">
+            {{ form.hidden_tag() }}
+            <div class="mb-3">
+                <label class="form-label">{{ form.title.label }}</label>
+                {{ form.title(class="form-control") }}
+                {% for error in form.title.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                {% endfor %}
             </div>
-
-            <div class="form-group">
-                <label for="category">Danh mục</label>
-                <select id="category" name="category" required>
-                    <option value="">-- Chọn danh mục --</option>
-                    {% for cat in ['music', 'sports', 'seminar', 'conference', 'festival', 'workshop', 'party', 'competition', 'other'] %}
-                        <option value="{{ cat }}">{{ cat | get_category_title }}</option>
-                    {% endfor %}
-                </select>
+            <div class="mb-3">
+                <label class="form-label">{{ form.description.label }}</label>
+                {{ form.description(class="form-control") }}
+                {% for error in form.description.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                {% endfor %}
             </div>
-
-            <div class="form-group">
-                <label for="description">Mô tả</label>
-                <textarea id="description" name="description" required></textarea>
+            <div class="mb-3">
+                <label class="form-label">{{ form.category.label }}</label>
+                {{ form.category(class="form-control") }}
+                {% for error in form.category.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                {% endfor %}
             </div>
-
-            <div class="row">
-                <div class="column">
-                    <div class="form-group">
-                        <label for="location">Địa điểm</label>
-                        <input type="text" id="location" name="location" required>
-                    </div>
-                </div>
-                <div class="column">
-                    <div class="form-group">
-                        <label for="ticket-quantity">Số vé</label>
-                        <input type="number" id="ticket-quantity" name="ticket_quantity" min="1" required>
-                    </div>
-                </div>
-                <div class="column">
-                    <div class="form-group">
-                        <label for="price">Giá vé</label>
-                        <input type="number" id="price" name="price" min="0" required>
-                    </div>
-                </div>
-                <div class="column">
-                    <div class="form-group">
-                        <label for="poster">Tải hình ảnh</label>
-                        <input type="file" id="poster" name="poster" accept="image/*">
-                    </div>
-                </div>
+            <div class="mb-3">
+                <label class="form-label">{{ form.start_time.label }}</label>
+                {{ form.start_time(class="form-control") }}
+                {% for error in form.start_time.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                {% endfor %}
             </div>
-
-            <div class="row">
-                <div class="column">
-                    <div class="form-group">
-                        <label for="start-time">Ngày bắt đầu</label>
-                        <input type="datetime-local" id="start-time" name="start_time" required>
-                    </div>
-                </div>
-                <div class="column">
-                    <div class="form-group">
-                        <label for="end-time">Ngày kết thúc</label>
-                        <input type="datetime-local" id="end-time" name="end_time" required>
-                    </div>
-                </div>
+            <div class="mb-3">
+                <label class="form-label">{{ form.end_time.label }}</label>
+                {{ form.end_time(class="form-control") }}
+                {% for error in form.end_time.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                {% endfor %}
             </div>
-
-            <div class="buttons">
-                <button type="submit" class="btn btn-primary">Tạo sự kiện</button>
-                <button type="reset" class="btn btn-secondary">Xóa thông tin</button>
-                <a href="{{ url_for('my_events') }}" class="btn btn-outline-secondary">Thoát</a>
+            <div class="mb-3">
+                <label class="form-label">{{ form.location.label }}</label>
+                {{ form.location(class="form-control") }}
+                {% for error in form.location.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                {% endfor %}
             </div>
+            <div class="mb-3">
+                <label class="form-label">{{ form.ticket_name.label }}</label>
+                {{ form.ticket_name(class="form-control") }}
+                {% for error in form.ticket_name.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                {% endfor %}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">{{ form.price.label }}</label>
+                {{ form.price(class="form-control") }}
+                {% for error in form.price.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                {% endfor %}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">{{ form.ticket_quantity.label }}</label>
+                {{ form.ticket_quantity(class="form-control") }}
+                {% for error in form.ticket_quantity.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                {% endfor %}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">{{ form.poster.label }}</label>
+                {{ form.poster(class="form-control") }}
+                {% for error in form.poster.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                {% endfor %}
+            </div>
+            <button type="submit" class="btn btn-primary">Tạo Sự Kiện</button>
+            <a href="{{ url_for('organizer_my_events') }}" class="btn btn-secondary">Hủy</a>
         </form>
-    </section>
-</div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/script.js') }}"></script>
-<script>
-    document.getElementById('createEventForm').addEventListener('submit', function(e) {
-        if (!window.EventHub.validateForm(this)) {
-            e.preventDefault();
-            window.EventHub.showAlert('Vui lòng điền đầy đủ thông tin bắt buộc', 'danger');
-        }
-    });
-</script>
-{% endblock %}
+    </div>
+    {% endblock %}
+</body>
+</html>

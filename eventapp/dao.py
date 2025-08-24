@@ -66,6 +66,29 @@ def calculate_event_stats(active_ticket_types, all_reviews):
         'review_count': len(all_reviews)
     }
 
+def get_all_events_revenue_stats():
+    """Lấy thống kê doanh thu cho tất cả sự kiện"""
+    events = db.session.query(Event).options(
+        joinedload(Event.ticket_types)
+    ).filter_by(is_active=True).all()
+
+    stats = []
+    total_revenue = 0
+    for event in events:
+        active_ticket_types = [tt for tt in event.ticket_types if tt.is_active]
+        stat = calculate_event_stats(active_ticket_types, event.reviews.all())
+        stats.append({
+            'event_id': event.id,
+            'title': event.title,
+            'total_tickets': stat['total_tickets'],
+            'sold_tickets': stat['sold_tickets'],
+            'available_tickets': stat['available_tickets'],
+            'revenue': stat['revenue']
+        })
+        total_revenue += stat['revenue']
+    
+    return stats, total_revenue
+
 def search_events(page=1, per_page=12, category='', search='', start_date='', end_date='', min_price=None, max_price=None):
     """Tìm kiếm và lọc sự kiện"""
     query = Event.query.filter_by(is_active=True)
@@ -195,3 +218,83 @@ def get_user_customer_group(user):
     except Exception as e:
         print(f"Error getting user group: {e}")
         return CustomerGroup.new
+
+# New functions for event management
+def create_event(data, user_id):
+    event = Event(
+        organizer_id=user_id,
+        title=data['title'],
+        description=data['description'],
+        category=EventCategory[data['category']],
+        start_time=data['start_time'],
+        end_time=data['end_time'],
+        location=data['location'],
+        is_active=True
+    )
+    db.session.add(event)
+    db.session.flush()  # Get event.id
+
+    # Create TicketType
+    ticket_type = TicketType(
+        event_id=event.id,
+        name=data['ticket_name'],
+        price=data['price'],
+        total_quantity=data['ticket_quantity'],
+        sold_quantity=0,
+        is_active=True
+    )
+    db.session.add(ticket_type)
+
+    # Upload poster if provided
+    if data['poster']:
+        event.upload_poster(data['poster'])
+
+    db.session.commit()
+    return event
+
+def update_event(event_id, data, user_id):
+    event = Event.query.get(event_id)
+    if not event or event.organizer_id != user_id:
+        raise ValueError('Event not found or not owned by user')
+
+    # Update fields if provided
+    if 'title' in data and data['title']:
+        event.title = data['title']
+    if 'description' in data and data['description']:
+        event.description = data['description']
+    if 'category' in data and data['category']:
+        event.category = EventCategory[data['category']]
+    if 'start_time' in data and data['start_time']:
+        event.start_time = data['start_time']
+    if 'end_time' in data and data['end_time']:
+        event.end_time = data['end_time']
+    if 'location' in data and data['location']:
+        event.location = data['location']
+    if 'poster' in data and data['poster']:
+        event.upload_poster(data['poster'])
+
+    # Update TicketType (assume first one)
+    ticket_type = event.ticket_types.first()
+    if ticket_type:
+        if 'ticket_name' in data and data['ticket_name']:
+            ticket_type.name = data['ticket_name']
+        if 'price' in data and data['price'] is not None:
+            ticket_type.price = data['price']
+        if 'ticket_quantity' in data and data['ticket_quantity'] is not None:
+            if data['ticket_quantity'] < ticket_type.sold_quantity:
+                raise ValidationError('Cannot reduce quantity below sold tickets')
+            ticket_type.total_quantity = data['ticket_quantity']
+
+    db.session.commit()
+    return event
+
+def delete_event(event_id, user_id):
+    event = Event.query.get(event_id)
+    if not event or event.organizer_id != user_id:
+        raise ValueError('Event not found or not owned by user')
+    event.is_active = False
+    db.session.commit()
+
+def bulk_delete_events(event_ids, user_id):
+    for event_id in event_ids:
+        delete_event(event_id, user_id)

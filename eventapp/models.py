@@ -14,8 +14,8 @@ from cloudinary import CloudinaryImage
 class UserRole(enum.Enum):
     admin = 'admin'
     organizer = 'organizer'
-    staff='staff'
-    customer='customer'
+    staff = 'staff'
+    customer = 'customer'
 
 # Customer groups enum
 class CustomerGroup(enum.Enum):
@@ -23,6 +23,12 @@ class CustomerGroup(enum.Enum):
     regular = 'regular'
     vip = 'vip'
     super_vip = 'super_vip'
+
+# Association table for event-staff (many-to-many)
+event_staff = db.Table('event_staff',
+    db.Column('event_id', db.Integer, db.ForeignKey('events.id'), primary_key=True),
+    db.Column('staff_id', db.Integer, db.ForeignKey('users.id'), primary_key=True)
+)
 
 class User(db.Model, UserMixin):
     __tablename__ = 'users'
@@ -41,13 +47,20 @@ class User(db.Model, UserMixin):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
-
+    
+    # New: Link to organizer who created this user
+    creator_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_staff = relationship('User', foreign_keys='User.creator_id', lazy='dynamic')
+    
     # Relationships
     organized_events = relationship('Event', back_populates='organizer', lazy='dynamic')
     tickets = relationship('Ticket', back_populates='user', lazy='dynamic')
     payments = relationship('Payment', back_populates='user', lazy='dynamic')
     reviews = relationship('Review', back_populates='user', lazy='dynamic')
     user_notifications = relationship('UserNotification', back_populates='user', lazy='dynamic')
+    
+    # New: Staff assigned to events
+    assigned_events = relationship('Event', secondary=event_staff, lazy='dynamic', back_populates='staff')
 
     def get_id(self):
         """Phương thức bắt buộc bởi Flask-Login để lấy ID người dùng"""
@@ -160,13 +173,16 @@ class Event(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
+    
     # Relationships
     organizer = relationship('User', back_populates='organized_events')
     tickets = relationship('Ticket', back_populates='event', lazy='dynamic')
     ticket_types = relationship('TicketType', back_populates='event', lazy='dynamic')
     reviews = relationship('Review', back_populates='event', lazy='dynamic')
     trending_log = relationship('EventTrendingLog', uselist=False, back_populates='event')
+    
+    # New: Staff assigned to this event
+    staff = relationship('User', secondary=event_staff, lazy='dynamic', back_populates='assigned_events')
 
     __table_args__ = (
         CheckConstraint('start_time < end_time', name='start_time_before_end_time'),
@@ -229,7 +245,6 @@ class Event(db.Model):
                 print(f"Error deleting poster: {e}")
                 return None
 
-    # ...existing properties and methods remain the same...
     @property
     def total_tickets(self):
         """Calculate total tickets from all ticket types"""
@@ -285,14 +300,6 @@ class Event(db.Model):
     def get_active_ticket_types(self):
         """Get only active ticket types"""
         return [tt for tt in self.ticket_types if tt.is_active]
-    
-    @property
-    def is_sold_out(self):
-        """Check if all ticket types are sold out"""
-        ticket_types_list = list(self.ticket_types)
-        if not ticket_types_list:
-            return False  # No ticket types means not sold out
-        return all(tt.is_sold_out for tt in ticket_types_list)
 
 class TicketType(db.Model):
     __tablename__ = 'ticket_types'
@@ -361,8 +368,6 @@ class Ticket(db.Model):
         Index('ix_ticket_user_event', 'user_id', 'event_id'),
         Index('ix_ticket_type', 'ticket_type_id'),
         Index('ix_ticket_qr_code', 'qr_code'),
-        # Note: MySQL doesn't support subqueries in CHECK constraints
-        # Data integrity will be enforced at application level
     )
 
     def __repr__(self):
@@ -611,7 +616,6 @@ class EventTrendingLog(db.Model):
     def __repr__(self):
         return f'<EventTrendingLog event_id={self.event_id}>'
 
-# Review system
 class Review(db.Model):
     __tablename__ = 'reviews'
 
@@ -651,7 +655,6 @@ class Review(db.Model):
             return self.user_id == self.event.organizer_id
         return False
 
-# Notification system - Fixed to match Django approach
 class Notification(db.Model):
     __tablename__ = 'notifications'
 
@@ -710,7 +713,6 @@ class Notification(db.Model):
         
         return self.send_to_users(users, send_email)
 
-# Many-to-many relationship between User and Notification with read status
 class UserNotification(db.Model):
     __tablename__ = 'user_notifications'
 
@@ -729,7 +731,6 @@ class UserNotification(db.Model):
     __table_args__ = (
         Index('ix_user_notification_user_read', 'user_id', 'is_read'),
         Index('ix_user_notification_user_notif', 'user_id', 'notification_id'),
-        # Ensure each user gets each notification only once
         db.UniqueConstraint('user_id', 'notification_id', name='unique_user_notification'),
     )
 
@@ -741,7 +742,6 @@ class UserNotification(db.Model):
             self.is_read = True
             self.read_at = datetime.utcnow()
 
-# Language support structure (for future i18n integration)
 class Translation(db.Model):
     __tablename__ = 'translations'
 
@@ -759,4 +759,3 @@ class Translation(db.Model):
 
     def __repr__(self):
         return f'<Translation {self.key}:{self.language}>'
-
