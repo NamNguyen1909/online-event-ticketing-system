@@ -101,11 +101,11 @@
 
                     <!-- Menu cho Organizer -->
                     {% if current_user and current_user.is_authenticated and current_user.role.value == 'organizer' %}
-                        <li class="nav-item">
+                        {#<li class="nav-item">
                             <a class="nav-link" href="{{ url_for('organizer_dashboard') }}">
                                 <i class="fas fa-chart-bar me-1"></i>Thống Kê
                             </a>
-                        </li>
+                        </li>#}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="eventManagementDropdown" role="button" 
                                data-bs-toggle="dropdown" aria-expanded="false">
@@ -224,7 +224,7 @@
                                     {# <li><a class="dropdown-item" href="{{ url_for('my_tickets') }}"><i class="fas fa-ticket-alt me-2"></i>Vé Của Tôi</a></li> #}
                                     {# <li><a class="dropdown-item" href="{{ url_for('orders') }}"><i class="fas fa-shopping-bag me-2"></i>Đơn Hàng</a></li> #}
                                 {% elif current_user.role.value == 'organizer' %}
-                                    <li><a class="dropdown-item" href="{{ url_for('organizer_dashboard') }}"><i class="fas fa-chart-bar me-2"></i>Dashboard</a></li>
+                                    {#<li><a class="dropdown-item" href="{{ url_for('organizer_dashboard') }}"><i class="fas fa-chart-bar me-2"></i>Dashboard</a></li>#}
                                     <li><a class="dropdown-item" href="{{ url_for('organizer_my_events') }}"><i class="fas fa-calendar me-2"></i>Sự Kiện Của Tôi</a></li>
                                 {% elif current_user.role.value == 'staff' %}
                                     {# <li><a class="dropdown-item" href="{{ url_for('staff_scan') }}"><i class="fas fa-qrcode me-2"></i>Quét Vé</a></li> #}

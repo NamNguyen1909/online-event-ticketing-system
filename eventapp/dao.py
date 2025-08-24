@@ -139,28 +139,27 @@ def get_events_by_category(category):
         return None
 
 def get_category_title(category):
-    """Lấy tiêu đề danh mục"""
-    category_titles = {
-        'music': 'Âm Nhạc',
-        'sports': 'Thể Thao', 
-        'seminar': 'Hội Thảo',
-        'conference': 'Hội Nghị',
-        'festival': 'Lễ Hội',
-        'workshop': 'Workshop',
-        'party': 'Tiệc Party',
-        'competition': 'Cuộc Thi',
-        'other': 'Khác'
-    }
-    return category_titles.get(category.lower(), category.title())
+    """Lấy tiêu đề danh mục từ EventCategory enum"""
+    category_value = category.value if hasattr(category, 'value') else category
+    try:
+        # Kiểm tra xem category_value có phải là giá trị hợp lệ của EventCategory
+        EventCategory(category_value)
+        # Trả về tên của enum với định dạng title (ví dụ: 'music' -> 'Music')
+        return category_value.title()
+    except ValueError:
+        print(f"Invalid category: {category_value}")
+        return 'Unknown'
 
 # User related functions
 def get_user_tickets(user_id):
     """Lấy vé của người dùng"""
     return Ticket.query.filter_by(user_id=user_id).all()
 
-def get_user_events(user_id):
-    """Lấy sự kiện của organizer"""
-    return Event.query.filter_by(organizer_id=user_id).all()
+def get_user_events(user_id, page=1, per_page=10):
+    """Lấy sự kiện của organizer với phân trang"""
+    return Event.query.filter_by(organizer_id=user_id).order_by(Event.start_time.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
 
 def get_user_payments(user_id):
     """Lấy thanh toán của người dùng"""

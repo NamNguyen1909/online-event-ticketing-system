@@ -13,6 +13,21 @@ from eventapp.auth import validate_email, validate_password
 from sqlalchemy.orm import joinedload
 import logging
 
+# Đăng ký bộ lọc
+def get_category_title(category):
+    """Bộ lọc để lấy tiêu đề danh mục từ giá trị enum"""
+    return dao.get_category_title(category)
+
+def format_currency(value):
+    """Bộ lọc để định dạng giá tiền thành VNĐ"""
+    try:
+        return f"{value:,.0f} VNĐ"
+    except:
+        return value
+
+app.jinja_env.filters['get_category_title'] = get_category_title
+app.jinja_env.filters['format_currency'] = format_currency
+
 # Custom validator for start < end
 class TimeComparison(object):
     def __init__(self, fieldname, message=None):
@@ -102,7 +117,8 @@ def event_detail(event_id):
                              ticket_types=active_ticket_types,
                              reviews=main_reviews,
                              stats=stats,
-                             can_reply=can_reply)
+                             can_reply=can_reply,
+                             dao=dao)
                              
     except Exception as e:
         logging.error(f"Lỗi trong event_detail: {str(e)}")
@@ -142,90 +158,9 @@ def category(category):
     category_title = dao.get_category_title(category)
     
     return render_template('customer/EventList.html', 
-                  events=events, 
-                  category=category,
-                  category_title=category_title)
-
-@app.route('/admin/dashboard', methods=['GET'])
-@login_required
-def admin_dashboard():
-    """Bảng điều khiển admin để hiển thị báo cáo doanh thu cho tất cả sự kiện"""
-    if current_user.role.value != 'admin':
-        abort(403)  # Cấm nếu không phải admin
-
-    try:
-        # Lấy tất cả sự kiện với ticket types bằng eager loading
-        events = db.session.query(Event).options(
-            joinedload(Event.ticket_types)
-        ).filter_by(is_active=True).all()
-
-        # Tính toán thống kê cho mỗi sự kiện
-        stats = []
-        total_revenue = 0
-        for event in events:
-            active_ticket_types = [tt for tt in event.ticket_types if tt.is_active]
-            stat = dao.calculate_event_stats(active_ticket_types, event.reviews.all())
-            stats.append({
-                'event_id': event.id,
-                'title': event.title,
-                'total_tickets': stat['total_tickets'],
-                'sold_tickets': stat['sold_tickets'],
-                'available_tickets': stat['available_tickets'],
-                'revenue': stat['revenue']
-            })
-            total_revenue += stat['revenue']
-
-        # Chuẩn bị dữ liệu cho Chart.js
-        chart_data = {
-            'labels': [event.title for event in events],
-            'revenues': [stat['revenue'] for stat in stats]
-        }
-
-        return render_template('admin/AdminDashboard.html',
-                             stats=stats,
-                             total_revenue=total_revenue,
-                             chart_data=chart_data)
-
-    except Exception as e:
-        logging.error(f"Lỗi trong admin_dashboard: {str(e)}")
-        abort(500)
-
-@app.route('/support')
-def support():
-    return render_template('support.html')
-
-@app.route('/test-session')
-def test_session():
-    """Kiểm tra session và trạng thái xác thực"""
-    session_info = {
-        'current_user_id': current_user.id if current_user.is_authenticated else None,
-        'current_user_username': current_user.username if current_user.is_authenticated else None,
-        'session_items': dict(session),
-        'session_permanent': session.permanent,
-        'session_modified': session.modified,
-        'app_secret_key_set': bool(app.config.get('SECRET_KEY')),
-        'login_manager_user_loader': login_manager.user_loader is not None,
-    }
-    
-    return f"<pre>{json.dumps(session_info, indent=2, default=str)}</pre>"
-
-@app.route('/test-auth')
-def test_auth():
-    """Kiểm tra trạng thái xác thực"""
-    if current_user.is_authenticated:
-        return f"<h2>Đã đăng nhập</h2><p>User: {current_user.username}</p><p>ID: {current_user.id}</p>"
-    else:
-        return f"<h2>Chưa đăng nhập</h2><p><a href='{url_for('auth.login')}'>Đăng nhập</a></p>"
-
-# Các tuyến đường cho người tổ chức
-@app.route('/organizer/dashboard', methods=['GET'])
-@login_required
-def organizer_dashboard():
-    """Bảng điều khiển người tổ chức"""
-    if current_user.role.value != 'organizer':
-        abort(403)
-    logging.debug(f"Truy cập bảng điều khiển người tổ chức cho người dùng: {current_user.username}")
-    return redirect(url_for('organizer_my_events'))
+                         events={'items': events},  # Wrap in dict to match pagination object
+                         category=category,
+                         category_title=category_title)
 
 @app.route('/organizer/create-event', methods=['GET', 'POST'])
 @login_required
@@ -247,15 +182,106 @@ def organizer_create_event():
     
     return render_template('organizer/CreateEvent.html', form=form)
 
-@app.route('/organizer/my-events', methods=['GET'])
+@app.route('/api/event/<int:event_id>', methods=['GET'])
+@login_required
+def get_event_data(event_id):
+    """Lấy chi tiết sự kiện qua API"""
+    try:
+        if current_user.role.value != 'organizer':
+            return jsonify({'success': False, 'message': 'Không có quyền truy cập'}), 403
+        
+        event = dao.get_event_detail(event_id)
+        if not event or event.organizer_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Sự kiện không tồn tại hoặc không thuộc quyền quản lý'}), 404
+        
+        ticket_type = event.ticket_types.first()
+        return jsonify({
+            'success': True,
+            'event': {
+                'title': event.title,
+                'category': event.category.value,
+                'description': event.description,
+                'location': event.location,
+                'ticket_quantity': ticket_type.total_quantity if ticket_type else 0,
+                'price': ticket_type.price if ticket_type else 0,
+                'start_time': event.start_time.strftime('%Y-%m-%dT%H:%M'),
+                'end_time': event.end_time.strftime('%Y-%m-%dT%H:%M')
+            }
+        })
+    except Exception as e:
+        logging.error(f"Lỗi khi lấy dữ liệu sự kiện {event_id}: {str(e)}")
+        return jsonify({'success': False, 'message': f'Lỗi khi tải dữ liệu sự kiện: {str(e)}'}), 500
+
+@app.route('/organizer/my-events', methods=['GET', 'POST'])
 @login_required
 def organizer_my_events():
-    """Hiển thị danh sách sự kiện của người tổ chức"""
+    """Hiển thị danh sách sự kiện của người tổ chức và xử lý cập nhật sự kiện"""
     if current_user.role.value != 'organizer':
         abort(403)
     
-    events = dao.get_user_events(current_user.id)
-    return render_template('organizer/MyEvents.html', events=events)
+    if request.method == 'POST':
+        form = UpdateEventForm()
+        if form.validate_on_submit():
+            try:
+                event_id = request.form.get('event_id', type=int)
+                if not event_id:
+                    flash('Không tìm thấy ID sự kiện', 'danger')
+                    return redirect(url_for('organizer_my_events'))
+                
+                event = dao.get_event_detail(event_id)
+                if not event or event.organizer_id != current_user.id:
+                    flash('Sự kiện không tồn tại hoặc bạn không có quyền chỉnh sửa', 'danger')
+                    return redirect(url_for('organizer_my_events'))
+                
+                data = form.data
+                dao.update_event(event_id, data, current_user.id)
+                flash('Cập nhật sự kiện thành công!', 'success')
+                return redirect(url_for('organizer_my_events'))
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Lỗi khi cập nhật sự kiện: {str(e)}', 'danger')
+                logging.error(f"Lỗi khi cập nhật sự kiện: {str(e)}")
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    flash(f'Lỗi ở trường {field}: {error}', 'danger')
+    
+    page = request.args.get('page', 1, type=int)
+    events = dao.get_user_events(current_user.id, page=page, per_page=10)
+    return render_template('organizer/MyEvents.html', events=events, dao=dao, form=UpdateEventForm())
+
+@app.route('/organizer/delete-event/<int:event_id>', methods=['POST'])
+@login_required
+def delete_event(event_id):
+    """Xóa sự kiện"""
+    try:
+        if current_user.role.value != 'organizer':
+            return jsonify({'success': False, 'message': 'Không có quyền truy cập'}), 403
+        
+        dao.delete_event(event_id, current_user.id)
+        return jsonify({'success': True, 'message': 'Xóa sự kiện thành công!'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Lỗi khi xóa sự kiện: {str(e)}'}), 500
+
+@app.route('/organizer/bulk-delete-events', methods=['POST'])
+@login_required
+def bulk_delete_events():
+    """Xóa nhiều sự kiện"""
+    try:
+        if current_user.role.value != 'organizer':
+            return jsonify({'success': False, 'message': 'Không có quyền truy cập'}), 403
+        
+        data = request.json
+        event_ids = data.get('event_ids', [])
+        if not event_ids:
+            return jsonify({'success': False, 'message': 'Không có sự kiện nào được chọn'}), 400
+        
+        dao.bulk_delete_events(event_ids, current_user.id)
+        return jsonify({'success': True, 'message': 'Xóa các sự kiện thành công!'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Lỗi khi xóa sự kiện: {str(e)}'}), 500
 
 @app.route('/organizer/revenue-reports', methods=['GET'])
 @login_required
