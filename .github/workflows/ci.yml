@@ -23,7 +23,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # cd eventapp
           pip install --upgrade pip
           pip install -r eventapp/requirements.txt
 
