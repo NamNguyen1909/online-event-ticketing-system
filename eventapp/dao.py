@@ -309,6 +309,8 @@ def vnpay_redirect_flask():
         for ticket in tickets:
             ticket.is_paid = True
             ticket.purchase_date = datetime.utcnow()
+            # Tạo QR code dựa trên uuid của ticket
+            ticket.generate_qr_code()
             # Cập nhật sold_quantity
             if ticket.ticket_type:
                 ticket.ticket_type.sold_quantity += 1
