@@ -9,14 +9,13 @@ services:
     name: eventhub
     runtime: python
     buildCommand: |
-      pip install -r requirements.txt
-      export FLASK_APP=eventapp
       cd eventapp
-      flask db upgrade
-      flask db migrate -m "autoDeploy" || true
-      flask db upgrade
+      pip install -r requirements.txt
+      ls -l migrations
+      flask db upgrade || { echo "[ERROR] DB upgrade failed"; exit 1; }
       cd ..
-      python seed.py
+      python seed.py || { echo "[ERROR] Seed database failed"; exit 1; }
+
     startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT eventapp:app
     envVars:
       - key: DATABASE_URL
@@ -28,7 +27,7 @@ services:
       - key: FLASK_ENV
         value: production
       - key: FLASK_APP
-        value: eventapp
+        value: app
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
