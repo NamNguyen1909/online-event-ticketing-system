@@ -15,7 +15,7 @@ services:
       ls -l eventapp/migrations
       
       ls -l migrations
-      # flask db upgrade || { echo "[ERROR] DB upgrade failed"; exit 1; }
+      flask db upgrade || { echo "[ERROR] DB upgrade failed"; exit 1; }
       cd ..
       python seed.py || { echo "[ERROR] Seed database failed"; exit 1; }
 
