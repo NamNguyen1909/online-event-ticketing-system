@@ -377,11 +377,11 @@ def seed_database():
     try:
         print("🌱 Bắt đầu seed database...")
         
-        # Kiểm tra xem đã có dữ liệu chưa
-        existing_users = User.query.first()
-        if existing_users:
-            print("📊 Database đã có dữ liệu, bỏ qua seed")
-            return
+        # # Kiểm tra xem đã có dữ liệu chưa
+        # existing_users = User.query.first()
+        # if existing_users:
+        #     print("📊 Database đã có dữ liệu, bỏ qua seed")
+        #     return
         
         print("🧹 Xóa dữ liệu cũ...")
         # Xóa từng bảng một cách an toàn

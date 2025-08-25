@@ -10,7 +10,7 @@ services:
     runtime: python
     buildCommand: |
       pip install -r requirements.txt
-      export FLASK_APP=eventapp
+      export FLASK_APP=eventapp:app
       cd eventapp
       flask db upgrade
       cd ..
