@@ -1,0 +1,32 @@
+{% extends 'layout/base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Vé của tôi</h2>
+    {% if tickets %}
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Mã vé</th>
+                <th>Sự kiện</th>
+                <th>Loại vé</th>
+                <th>Ngày mua</th>
+                <th>Trạng thái</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ticket in tickets %}
+            <tr>
+                <td>{{ ticket.uuid }}</td>
+                <td>{{ ticket.event.title if ticket.event else 'N/A' }}</td>
+                <td>{{ ticket.ticket_type.name if ticket.ticket_type else 'N/A' }}</td>
+                <td>{{ ticket.purchase_date.strftime('%d/%m/%Y %H:%M') if ticket.purchase_date else 'N/A' }}</td>
+                <td><span class="badge bg-success">Đã thanh toán</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="alert alert-info">Bạn chưa có vé nào đã thanh toán thành công.</div>
+    {% endif %}
+</div>
+{% endblock %}
