@@ -452,8 +452,9 @@ class Ticket(db.Model):
             raise ValueError(f"Ticket type {self.ticket_type.name} is sold out")
 
 class PaymentMethod(enum.Enum):
-    momo = 'momo'
     vnpay = 'vnpay'
+    momo = 'momo'
+    
 
 class DiscountCode(db.Model):
     __tablename__ = 'discount_codes'

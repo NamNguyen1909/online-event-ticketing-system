@@ -353,7 +353,10 @@ function processPayment() {
         alert('Vui lòng chọn ít nhất một loại vé!');
         return;
     }
-    
+
+    // LẤY GIÁ TRỊ PHƯƠNG THỨC THANH TOÁN ĐANG CHỌN
+    const selectedPaymentMethod = document.getElementById('paymentMethod').value;
+
     // Prepare booking data
     const bookingData = {
         event_id: {{ event.id }},
@@ -363,20 +366,20 @@ function processPayment() {
             price: selectedTickets[ticketId].price,
             name: selectedTickets[ticketId].name
         })),
-        payment_method: document.getElementById('paymentMethod').value,
+        payment_method: selectedPaymentMethod,
         discount_code: document.getElementById('discountCode').value || null,
         subtotal: calculateSubtotal(),
         discount_amount: calculateDiscountAmount(),
         total_amount: calculateFinalTotal()
     };
-    
+
     // Show loading
     const paymentBtn = document.getElementById('paymentBtn');
     const originalText = paymentBtn.innerHTML;
     paymentBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Đang xử lý...';
     paymentBtn.disabled = true;
-    
-    // Send to backend
+
+    // Gửi bookingData lên backend
     fetch('{{ url_for("process_booking") }}', {
         method: 'POST',
         headers: {
@@ -387,9 +390,13 @@ function processPayment() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Đặt vé thành công! (Demo mode)');
-            // In production: redirect to payment gateway or confirmation page
-            console.log('Booking data:', bookingData);
+            if (data.payment_url) {
+                // Nếu là VNPay, redirect sang cổng thanh toán
+                window.location.href = data.payment_url;
+            } else {
+                alert('Đặt vé thành công!');
+                window.location.href = '/my-tickets';
+            }
         } else {
             alert(data.message);
         }
