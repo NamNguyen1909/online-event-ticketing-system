@@ -620,8 +620,12 @@ class Review(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     rating = db.Column(db.Integer, nullable=False)  # 1-5 stars
     comment = db.Column(db.Text, nullable=True)
-    parent_review_id = db.Column(db.Integer, db.ForeignKey('reviews.id'), nullable=True)  # For replies
-
+    parent_review_id = db.Column(db.Integer, db.ForeignKey('reviews.id'), nullable=True)
+    parent_review = relationship(
+        'Review',
+        remote_side=[id],
+        backref=db.backref('replies', cascade="all, delete-orphan")
+    )
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
