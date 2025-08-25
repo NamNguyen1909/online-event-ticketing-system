@@ -11,9 +11,9 @@ services:
     workDir: .
     buildCommand: |
       pip install -r requirements.txt
-      if [ ! -d "migrations" ]; then flask db init; fi
-      flask db migrate -m "initial" || echo "[INFO] Không có thay đổi migration"
+      cd eventapp
       flask db upgrade || { echo "[ERROR] DB upgrade failed"; exit 1; }
+      cd ..
       python seed.py || { echo "[ERROR] Seed database failed"; exit 1; }
 
     startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT eventapp:app
