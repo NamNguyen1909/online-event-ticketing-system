@@ -1,0 +1,42 @@
+databases:
+  - name: eventhub-db
+    databaseName: eventhub
+    user: eventhub_user
+    plan: free
+
+services:
+  - type: web
+    name: eventhub
+    runtime: python
+    buildCommand: |
+      cd eventapp
+      pip install -r requirements.txt
+      cd ..
+      export FLASK_APP=eventapp
+      # cd eventapp
+      # flask db upgrade
+      # flask db migrate -m "Auto migration" || true
+      # flask db upgrade
+      # cd ..
+      python seed.py
+    startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT eventapp:app
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: eventhub-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_APP
+        value: eventapp
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+    plan: free
+    healthCheckPath: /
+    autoDeploy: true
