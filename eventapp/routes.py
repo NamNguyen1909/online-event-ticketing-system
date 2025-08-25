@@ -5,7 +5,7 @@ from flask import flash, jsonify, render_template, request, abort, session, redi
 from flask_login import login_required, current_user
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
-from wtforms import StringField, TextAreaField, SelectField, DateTimeLocalField, FloatField, IntegerField
+from wtforms import StringField, TextAreaField, SelectField, DateTimeLocalField, FloatField, IntegerField, DecimalField
 from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError
 from datetime import datetime
 from werkzeug.security import generate_password_hash
@@ -43,16 +43,19 @@ class TimeComparison(object):
 
 # Form for create event
 class CreateEventForm(FlaskForm):
+    ticket_name = StringField("Tên vé", validators=[DataRequired(), Length(min=3, max=255)])
     title = StringField('Tiêu Đề', validators=[DataRequired(), Length(min=3, max=255)])
     description = TextAreaField('Mô Tả', validators=[DataRequired(), Length(max=5000)])
     category = SelectField('Danh Mục', validators=[DataRequired()], choices=[(cat.value, cat.name.title()) for cat in EventCategory])
+    price = DecimalField("Giá vé", validators=[DataRequired(), NumberRange(min=0)], places=2)
     start_time = DateTimeLocalField('Thời Gian Bắt Đầu', validators=[DataRequired()], format='%Y-%m-%dT%H:%M')
     end_time = DateTimeLocalField('Thời Gian Kết Thúc', validators=[DataRequired()], format='%Y-%m-%dT%H:%M')
     location = StringField('Địa Điểm', validators=[DataRequired(), Length(max=500)])
-    ticket_name = StringField('Tên Vé', validators=[DataRequired(), Length(max=100)])
-    price = FloatField('Giá', validators=[DataRequired(), NumberRange(min=0)])
-    ticket_quantity = IntegerField('Số Lượng Vé', validators=[DataRequired(), NumberRange(min=1)])
     poster = FileField('Poster', validators=[Optional(), FileAllowed(['jpg', 'png'], 'Chỉ cho phép ảnh!')])
+    ticket_quantity = IntegerField("Số lượng vé", validators=[
+        DataRequired(),
+        NumberRange(min=1, message="Số lượng phải lớn hơn 0")
+    ])
 
     def validate_end_time(self, field):
         if self.start_time.data >= field.data:
@@ -66,9 +69,6 @@ class UpdateEventForm(CreateEventForm):
     start_time = DateTimeLocalField('Thời Gian Bắt Đầu', validators=[Optional()], format='%Y-%m-%dT%H:%M')
     end_time = DateTimeLocalField('Thời Gian Kết Thúc', validators=[Optional()], format='%Y-%m-%dT%H:%M')
     location = StringField('Địa Điểm', validators=[Optional(), Length(max=500)])
-    ticket_name = StringField('Tên Vé', validators=[Optional(), Length(max=100)])
-    price = FloatField('Giá', validators=[Optional(), NumberRange(min=0)])
-    ticket_quantity = IntegerField('Số Lượng Vé', validators=[Optional(), NumberRange(min=1)])
     poster = FileField('Poster', validators=[Optional(), FileAllowed(['jpg', 'png'], 'Chỉ cho phép ảnh!')])
 
 @app.route('/')
@@ -165,20 +165,38 @@ def category(category):
 @app.route('/organizer/create-event', methods=['GET', 'POST'])
 @login_required
 def organizer_create_event():
-    """Tạo sự kiện mới"""
+    """Tạo sự kiện mới với loại vé động"""
     if current_user.role.value != 'organizer':
         abort(403)
     
     form = CreateEventForm()
     if form.validate_on_submit():
         try:
-            data = form.data
-            event = dao.create_event(data, current_user.id)
+            data = {
+                'title': form.title.data,
+                'description': form.description.data,
+                'category': form.category.data,
+                'start_time': form.start_time.data,
+                'end_time': form.end_time.data,
+                'location': form.location.data,
+                'poster': form.poster.data,
+                'ticket_types': []
+            }
+            ticket_names = request.form.getlist('ticket_names[]')
+            ticket_prices = request.form.getlist('ticket_prices[]')
+            ticket_quantities = request.form.getlist('ticket_quantities[]')
+            for i in range(len(ticket_names)):
+                data['ticket_types'].append({
+                    'name': ticket_names[i],
+                    'price': float(ticket_prices[i]),
+                    'total_quantity': int(ticket_quantities[i])
+                })
+            dao.create_event_with_tickets(data, current_user.id)
             flash('Tạo sự kiện thành công!', 'success')
             return redirect(url_for('organizer_my_events'))
         except Exception as e:
             db.session.rollback()
-            flash(f'Lỗi khi tạo sự kiện: {str(e)}', 'danger')
+            flash(f'Lỗi: {str(e)}', 'danger')
     
     return render_template('organizer/CreateEvent.html', form=form)
 
@@ -211,6 +229,32 @@ def get_event_data(event_id):
     except Exception as e:
         logging.error(f"Lỗi khi lấy dữ liệu sự kiện {event_id}: {str(e)}")
         return jsonify({'success': False, 'message': f'Lỗi khi tải dữ liệu sự kiện: {str(e)}'}), 500
+
+@app.route('/organizer/event/<int:event_id>', methods=['GET'])
+@login_required
+def get_event_data_full(event_id):
+    """Lấy toàn bộ chi tiết sự kiện với các loại vé"""
+    if current_user.role.value != 'organizer':
+        abort(403)
+    event = Event.query.get_or_404(event_id)
+    if event.organizer_id != current_user.id:
+        abort(403)
+    return jsonify({
+        'id': event.id,
+        'title': event.title,
+        'category': event.category.value,
+        'description': event.description,
+        'location': event.location,
+        'start_time': event.start_time.isoformat(),
+        'end_time': event.end_time.isoformat(),
+        'poster_url': event.poster_url,
+        'ticket_types': [{
+            'id': tt.id,
+            'name': tt.name,
+            'price': float(tt.price),
+            'total_quantity': tt.total_quantity
+        } for tt in event.ticket_types]
+    })
 
 @app.route('/organizer/my-events', methods=['GET', 'POST'])
 @login_required
@@ -250,6 +294,45 @@ def organizer_my_events():
     events = dao.get_user_events(current_user.id, page=page, per_page=10)
     return render_template('organizer/MyEvents.html', events=events, dao=dao, form=UpdateEventForm())
 
+@app.route('/organizer/update-event/<int:event_id>', methods=['POST'])
+@login_required
+def update_event_route(event_id):
+    """Cập nhật sự kiện với loại vé động"""
+    if current_user.role.value != 'organizer':
+        abort(403)
+    try:
+        form = UpdateEventForm()
+        if form.validate_on_submit():
+            data = {
+                'title': form.title.data,
+                'description': form.description.data,
+                'category': form.category.data,
+                'start_time': form.start_time.data,
+                'end_time': form.end_time.data,
+                'location': form.location.data,
+                'poster': form.poster.data,
+                'ticket_types': []
+            }
+            ticket_ids = request.form.getlist('ticket_type_ids[]')
+            ticket_names = request.form.getlist('ticket_names[]')
+            ticket_prices = request.form.getlist('ticket_prices[]')
+            ticket_quantities = request.form.getlist('ticket_quantities[]')
+            for i in range(len(ticket_names)):
+                data['ticket_types'].append({
+                    'id': ticket_ids[i] if ticket_ids[i] else None,
+                    'name': ticket_names[i],
+                    'price': float(ticket_prices[i]),
+                    'total_quantity': int(ticket_quantities[i])
+                })
+            dao.update_event_with_tickets(event_id, data, current_user.id)
+            flash('Cập nhật sự kiện thành công!', 'success')
+            return redirect(url_for('organizer_my_events'))
+        return render_template('organizer/MyEvents.html', form=form, events=dao.get_user_events(current_user.id))
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Lỗi: {str(e)}', 'danger')
+        return redirect(url_for('organizer_my_events'))
+
 @app.route('/organizer/delete-event/<int:event_id>', methods=['POST'])
 @login_required
 def delete_event(event_id):
@@ -282,6 +365,21 @@ def bulk_delete_events():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Lỗi khi xóa sự kiện: {str(e)}'}), 500
+
+@app.route('/organizer/bulk-delete-events', methods=['POST'])
+@login_required
+def bulk_delete_events_route():
+    """Xóa nhiều sự kiện (route thay thế)"""
+    if current_user.role.value != 'organizer':
+        abort(403)
+    try:
+        data = request.json
+        event_ids = data.get('event_ids', [])
+        dao.bulk_delete_events(event_ids, current_user.id)
+        return jsonify({'success': True, 'message': 'Ngưng hoạt động các sự kiện thành công!'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/organizer/revenue-reports', methods=['GET'])
 @login_required

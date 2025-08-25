@@ -1,915 +1,188 @@
 {% extends 'layout/base.html' %}
-
 {% block title %}{{ event.title }} - EventHub{% endblock %}
-
 {% block extra_css %}
-<style>
-    .event-image {
-        width: 100%;
-        height: 500px;
-        object-fit: cover;
-        border-radius: 15px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    }
-    
-    .event-info-card {
-        background: #fff;
-        border-radius: 15px;
-        padding: 25px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
-    }
-    
-    .event-title {
-        color: #2c3e50;
-        font-size: 2rem;
-        font-weight: 700;
-        margin-bottom: 15px;
-    }
-    
-    .event-meta {
-        display: flex;
-        align-items: center;
-        margin-bottom: 12px;
-        padding: 8px 0;
-        border-bottom: 1px solid #eee;
-    }
-    
-    .event-meta:last-child {
-        border-bottom: none;
-    }
-    
-    .event-meta i {
-        width: 20px;
-        color: #3498db;
-        margin-right: 12px;
-        font-size: 1rem;
-    }
-    
-    .event-meta-content {
-        flex: 1;
-    }
-    
-    .meta-label {
-        font-weight: 600;
-        color: #34495e;
-        margin-bottom: 3px;
-        font-size: 0.9rem;
-    }
-    
-    .meta-value {
-        color: #7f8c8d;
-        font-size: 0.85rem;
-    }
-    
-    .event-description {
-        background: #f8f9fa;
-        padding: 20px;
-        border-radius: 10px;
-        border-left: 4px solid #3498db;
-        line-height: 1.6;
-        font-size: 0.9rem;
-    }
-    
-    .ticket-section {
-        background: #fff;
-        border-radius: 15px;
-        padding: 25px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-        margin-top: 20px;
-    }
-    
-    .ticket-type-card {
-        border: 1px solid #e9ecef;
-        border-radius: 10px;
-        padding: 15px 20px;
-        margin-bottom: 12px;
-        background: #f8f9fa;
-        transition: all 0.3s ease;
-    }
-    
-    .ticket-type-card:hover {
-        background: #f1f3f4;
-        border-color: #dee2e6;
-    }
-    
-    .ticket-type-header {
-        display: flex;
-        justify-content: between;
-        align-items: flex-start;
-        margin-bottom: 8px;
-    }
-    
-    .ticket-type-info {
-        flex: 1;
-    }
-    
-    .ticket-type-name {
-        font-weight: 600;
-        color: #2c3e50;
-        margin: 0 0 4px 0;
-        font-size: 1rem;
-    }
-    
-    .ticket-type-description {
-        color: #6c757d;
-        font-size: 0.85rem;
-        margin: 0;
-    }
-    
-    .ticket-price {
-        font-size: 1.3rem;
-        font-weight: 700;
-        color: #e74c3c;
-        text-align: right;
-        min-width: 120px;
-    }
-    
-    .ticket-status {
-        display: flex;
-        justify-content: between;
-        align-items: center;
-        margin-top: 8px;
-        padding-top: 8px;
-        border-top: 1px solid #e9ecef;
-    }
-    
-    .ticket-quantity {
-        font-size: 0.85rem;
-        color: #6c757d;
-    }
-    
-    .ticket-availability {
-        font-size: 0.85rem;
-        font-weight: 500;
-    }
-    
-    .btn-book-ticket {
-        background: linear-gradient(45deg, #3498db, #2980b9);
-        border: none;
-        padding: 15px 40px;
-        border-radius: 25px;
-        color: white;
-        font-weight: 600;
-        font-size: 1.1rem;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
-    }
-    
-    .btn-book-ticket:hover {
-        background: linear-gradient(45deg, #2980b9, #1f4e79);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(52,152,219,0.4);
-        color: white;
-    }
-    
-    .btn-book-ticket:disabled {
-        background: #bdc3c7;
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
-    }
-    
-    .ticket-summary {
-        background: linear-gradient(135deg, #3498db, #2980b9);
-        color: white;
-        padding: 20px;
-        border-radius: 15px;
-        margin-bottom: 20px;
-        text-align: center;
-    }
-    
-    .summary-title {
-        font-size: 1.1rem;
-        font-weight: 600;
-        margin-bottom: 10px;
-    }
-    
-    .summary-stats {
-        display: flex;
-        justify-content: space-around;
-        margin-bottom: 15px;
-    }
-    
-    .summary-stat {
-        text-align: center;
-    }
-    
-    .summary-stat-number {
-        font-size: 1.5rem;
-        font-weight: 700;
-        display: block;
-        line-height: 1;
-    }
-    
-    .summary-stat-label {
-        font-size: 0.8rem;
-        opacity: 0.9;
-        margin-top: 3px;
-    }
-    
-    .event-stats {
-        display: flex;
-        justify-content: space-around;
-        background: #f8f9fa;
-        padding: 15px;
-        border-radius: 10px;
-        margin: 15px 0;
-    }
-    
-    .stat-item {
-        text-align: center;
-    }
-    
-    .stat-number {
-        font-size: 1.4rem;
-        font-weight: 700;
-        color: #2c3e50;
-        display: block;
-    }
-    
-    .stat-label {
-        font-size: 0.8rem;
-        color: #7f8c8d;
-        margin-top: 3px;
-    }
-    
-    .rating-stars {
-        color: #f39c12;
-        margin-left: 10px;
-    }
-    
-    .review-card {
-        background: #fff;
-        border: 1px solid #e9ecef;
-        border-radius: 10px;
-        padding: 20px;
-        margin-bottom: 15px;
-    }
-    
-    .review-reply {
-        background: #f8f9fa;
-        border: 1px solid #e9ecef;
-        border-radius: 8px;
-        padding: 15px;
-        margin: 10px 0 10px 30px;
-        border-left: 3px solid #3498db;
-    }
-    
-    .review-header {
-        display: flex;
-        justify-content: between;
-        align-items: center;
-        margin-bottom: 10px;
-    }
-    
-    .reviewer-info {
-        display: flex;
-        align-items: center;
-        flex: 1;
-    }
-    
-    .reviewer-avatar {
-        width: 35px;
-        height: 35px;
-        border-radius: 50%;
-        background: linear-gradient(45deg, #3498db, #2980b9);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
-        margin-right: 10px;
-        font-size: 0.85rem;
-    }
-    
-    .reviewer-details {
-        flex: 1;
-    }
-    
-    .reviewer-name {
-        font-weight: 600;
-        color: #2c3e50;
-        margin: 0;
-        font-size: 0.95rem;
-    }
-    
-    .organizer-badge {
-        background: #e74c3c;
-        color: white;
-        padding: 2px 6px;
-        border-radius: 10px;
-        font-size: 0.7rem;
-        margin-left: 8px;
-    }
-    
-    .review-date {
-        font-size: 0.8rem;
-        color: #7f8c8d;
-        margin: 0;
-    }
-    
-    .review-rating {
-        color: #f39c12;
-        margin-bottom: 10px;
-        font-size: 0.9rem;
-    }
-    
-    .event-status {
-        display: inline-block;
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-    }
-    
-    .status-upcoming {
-        background: #d4edda;
-        color: #155724;
-    }
-    
-    .status-ongoing {
-        background: #fff3cd;
-        color: #856404;
-    }
-    
-    .status-past {
-        background: #f8d7da;
-        color: #721c24;
-    }
-    
-    .organizer-info {
-        background: #f8f9fa;
-        padding: 15px;
-        border-radius: 10px;
-        margin-top: 15px;
-    }
-    
-    .organizer-avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        object-fit: cover;
-    }
-    
-    /* Đánh giá trung bình - thiết kế mới nhỏ gọn */
-    .rating-summary {
-        background: linear-gradient(135deg, #f39c12, #e67e22);
-        color: white;
-        padding: 15px 20px;
-        border-radius: 12px;
-        margin-bottom: 20px;
-        box-shadow: 0 3px 10px rgba(243,156,18,0.3);
-    }
-    
-    .rating-summary-content {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-    
-    .rating-main {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-    }
-    
-    .rating-number {
-        font-size: 2rem;
-        font-weight: 700;
-        margin: 0;
-        line-height: 1;
-    }
-    
-    .rating-details {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-    }
-    
-    .rating-stars-compact {
-        font-size: 1.1rem;
-        line-height: 1;
-    }
-    
-    .rating-text {
-        font-size: 0.85rem;
-        opacity: 0.9;
-        margin: 0;
-    }
-    
-    .rating-count {
-        text-align: center;
-        min-width: 80px;
-    }
-    
-    .rating-count-number {
-        font-size: 1.5rem;
-        font-weight: 700;
-        display: block;
-        line-height: 1;
-    }
-    
-    .rating-count-label {
-        font-size: 0.75rem;
-        opacity: 0.9;
-        margin-top: 2px;
-    }
-    
-    .reply-button {
-        background: none;
-        border: none;
-        color: #3498db;
-        font-size: 0.85rem;
-        cursor: pointer;
-        padding: 5px 10px;
-        border-radius: 5px;
-        transition: all 0.3s ease;
-    }
-    
-    .reply-button:hover {
-        background: rgba(52, 152, 219, 0.1);
-        color: #2980b9;
-    }
-    
-    .view-replies-btn {
-        background: none;
-        border: none;
-        color: #3498db;
-        font-size: 0.85rem;
-        cursor: pointer;
-        margin-top: 10px;
-        text-decoration: underline;
-    }
-    
-    .view-replies-btn:hover {
-        color: #2980b9;
-    }
-    
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
-        .event-title {
-            font-size: 1.5rem;
-        }
-        
-        .event-image {
-            height: 300px;
-        }
-        
-        .rating-number {
-            font-size: 1.7rem;
-        }
-        
-        .rating-summary-content {
-            flex-direction: column;
-            gap: 10px;
-            text-align: center;
-        }
-        
-        .rating-main {
-            justify-content: center;
-        }
-        
-        .ticket-type-header {
-            flex-direction: column;
-            gap: 8px;
-        }
-        
-        .ticket-price {
-            text-align: left;
-            min-width: auto;
-        }
-        
-        .summary-stats {
-            flex-direction: column;
-            gap: 10px;
-        }
-    }
-</style>
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <!-- Breadcrumb -->
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Trang chủ</a></li>
-            <li class="breadcrumb-item"><a href="{{ url_for('events') }}">Sự kiện</a></li>
-            <li class="breadcrumb-item active">{{ event.title }}</li>
-        </ol>
-    </nav>
+<div class="container mx-auto p-4">
+  <nav class="text-sm mb-4">
+    <a href="{{ url_for('index') }}" class="text-blue-500">Trang chủ</a> /
+    <a href="{{ url_for('search_events') }}" class="text-blue-500">Sự kiện</a> /
+    <span>{{ event.title }}</span>
+  </nav>
 
-    <div class="row">
-        <!-- Cột trái - Thông tin sự kiện (4/10) -->
-        <div class="col-lg-5">
-            <div class="event-info-card">
-                <!-- Tiêu đề và trạng thái -->
-                <div class="d-flex justify-content-between align-items-start mb-3">
-                    <h1 class="event-title">{{ event.title }}</h1>
-                    {% if event.is_upcoming %}
-                        <span class="event-status status-upcoming">Sắp diễn ra</span>
-                    {% elif event.is_ongoing %}
-                        <span class="event-status status-ongoing">Đang diễn ra</span>
-                    {% else %}
-                        <span class="event-status status-past">Đã kết thúc</span>
-                    {% endif %}
-                </div>
-
-                <!-- Thông tin meta -->
-                <div class="event-meta">
-                    <i class="far fa-calendar-alt"></i>
-                    <div class="event-meta-content">
-                        <div class="meta-label">Thời gian</div>
-                        <div class="meta-value">
-                            <strong>Bắt đầu:</strong> {{ event.start_time.strftime('%d/%m/%Y lúc %H:%M') }}<br>
-                            <strong>Kết thúc:</strong> {{ event.end_time.strftime('%d/%m/%Y lúc %H:%M') }}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="event-meta">
-                    <i class="fas fa-map-marker-alt"></i>
-                    <div class="event-meta-content">
-                        <div class="meta-label">Địa điểm</div>
-                        <div class="meta-value">{{ event.location }}</div>
-                    </div>
-                </div>
-
-                <div class="event-meta">
-                    <i class="fas fa-tag"></i>
-                    <div class="event-meta-content">
-                        <div class="meta-label">Danh mục</div>
-                        <div class="meta-value">
-                            <span class="badge bg-primary">{{ event.category.value.title() if event.category else 'N/A' }}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="event-meta">
-                    <i class="fas fa-user"></i>
-                    <div class="event-meta-content">
-                        <div class="meta-label">Người tổ chức</div>
-                        <div class="meta-value">{{ event.organizer.username }}</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Mô tả -->
-            <div class="event-info-card">
-                <h5><i class="fas fa-info-circle me-2"></i>Mô tả sự kiện</h5>
-                <div class="event-description">
-                    {{ event.description }}
-                </div>
-            </div>
-
-            <!-- Thông tin người tổ chức -->
-            <div class="event-info-card">
-                <h5><i class="fas fa-user-tie me-2"></i>Người tổ chức</h5>
-                <div class="organizer-info">
-                    <div class="d-flex align-items-center">
-                        {% if event.organizer.avatar_thumbnail_url %}
-                            <img src="{{ event.organizer.avatar_thumbnail_url }}" 
-                                 alt="{{ event.organizer.username }}" 
-                                 class="organizer-avatar me-3">
-                        {% else %}
-                            <div class="organizer-avatar me-3 bg-secondary d-flex align-items-center justify-content-center">
-                                <i class="fas fa-user text-white"></i>
-                            </div>
-                        {% endif %}
-                        <div>
-                            <h6 class="mb-1">{{ event.organizer.username }}</h6>
-                            <small class="text-muted">Tham gia từ {{ event.organizer.created_at.strftime('%m/%Y') }}</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Cột phải - Hình ảnh và đặt vé (6/10) -->
-        <div class="col-lg-7">
-            <!-- Hình ảnh sự kiện -->
-            <div class="mb-4">
-                {% if event.poster_url %}
-                    <img src="{{ event.poster_url }}" 
-                         alt="{{ event.title }}" 
-                         class="event-image">
-                {% else %}
-                    <div class="event-image bg-light d-flex align-items-center justify-content-center">
-                        <div class="text-center text-muted">
-                            <i class="fas fa-image fa-4x mb-3"></i>
-                            <h5>Chưa có hình ảnh</h5>
-                            <p>Hình ảnh sự kiện sẽ được cập nhật sớm</p>
-                        </div>
-                    </div>
-                {% endif %}
-            </div>
-
-            <!-- Thông tin vé và đặt vé -->
-            {% if ticket_types %}
-            <div class="ticket-section">
-                <h4 class="mb-3"><i class="fas fa-ticket-alt me-2"></i>Thông tin vé</h4>
-                
-                <!-- Tóm tắt vé -->
-                <div class="ticket-summary">
-                    <div class="summary-stats">
-                        <div class="summary-stat">
-                            <span class="summary-stat-number">{{ stats.total_tickets }}</span>
-                            <div class="summary-stat-label">Tổng vé</div>
-                        </div>
-                        <div class="summary-stat">
-                            <span class="summary-stat-number">{{ stats.available_tickets }}</span>
-                            <div class="summary-stat-label">Còn lại</div>
-                        </div>
-                        <div class="summary-stat">
-                            <span class="summary-stat-number">
-                                {% if ticket_types %}
-                                    {{ "{:,.0f}".format(ticket_types|min(attribute='price')|attr('price')) }}đ
-                                {% else %}
-                                    0đ
-                                {% endif %}
-                            </span>
-                            <div class="summary-stat-label">Giá từ</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Danh sách loại vé -->
-                {% for ticket_type in ticket_types %}
-                <div class="ticket-type-card">
-                    <div class="ticket-type-header">
-                        <div class="ticket-type-info">
-                            <h6 class="ticket-type-name">{{ ticket_type.name }}</h6>
-                            {% if ticket_type.description %}
-                            <p class="ticket-type-description">{{ ticket_type.description }}</p>
-                            {% endif %}
-                        </div>
-                        <div class="ticket-price">{{ "{:,.0f}".format(ticket_type.price) }}đ</div>
-                    </div>
-                    
-                    <div class="ticket-status">
-                        <div class="ticket-quantity">
-                            Tổng: {{ ticket_type.total_quantity }} vé | 
-                            Đã bán: {{ ticket_type.sold_quantity }} vé
-                        </div>
-                        <div class="ticket-availability">
-                            {% if ticket_type.is_sold_out %}
-                                <span class="text-danger"><i class="fas fa-times-circle"></i> Hết vé</span>
-                            {% else %}
-                                <span class="text-success">
-                                    <i class="fas fa-check-circle"></i> 
-                                    Còn {{ ticket_type.available_quantity }} vé
-                                </span>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-                
-                <!-- Nút đặt vé chính -->
-                {% if event.is_upcoming and stats.available_tickets > 0 %}
-                <div class="text-center mt-4">
-                    <a href="{{ url_for('book_ticket', event_id=event.id) }}" class="btn btn-primary btn-lg">
-                        <i class="fas fa-ticket-alt me-2"></i>Đặt Vé Ngay
-                    </a>
-                    <small class="text-muted d-block mt-2">
-                        <i class="fas fa-shield-alt me-1"></i>
-                        Thanh toán an toàn và bảo mật
-                    </small>
-                </div>
-                {% else %}
-                <div class="text-center mt-4">
-                    {% if event.is_past %}
-                    <div class="alert alert-secondary" role="alert">
-                        <i class="fas fa-clock me-2"></i>
-                        Sự kiện đã kết thúc
-                    </div>
-                    {% elif stats.available_tickets <= 0 %}
-                    <div class="alert alert-warning" role="alert">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        Tất cả các loại vé đã hết
-                    </div>
-                    {% else %}
-                    <div class="alert alert-info" role="alert">
-                        <i class="fas fa-info-circle me-2"></i>
-                        Hiện tại chưa thể đặt vé
-                    </div>
-                    {% endif %}
-                </div>
-                {% endif %}
-            </div>
-            {% else %}
-            <div class="ticket-section text-center">
-                <i class="fas fa-ticket-alt fa-3x text-muted mb-3"></i>
-                <h5>Chưa có thông tin vé</h5>
-                <p class="text-muted">Người tổ chức chưa thiết lập các loại vé cho sự kiện này.</p>
-            </div>
-            {% endif %}
-        </div>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <!-- Thông tin sự kiện -->
+    <div class="col-span-2">
+      <h1 class="text-2xl font-bold">{{ event.title }}</h1>
+      <span class="badge {{ 'badge-active' if event.is_upcoming or event.is_ongoing else 'badge-inactive' }} px-2 py-1 rounded">
+        {{ 'Sắp diễn ra' if event.is_upcoming else 'Đang diễn ra' if event.is_ongoing else 'Đã kết thúc' }}
+      </span>
+      <div class="mt-4">
+        <h3 class="font-bold">Thời gian</h3>
+        <p>Bắt đầu: {{ event.start_time.strftime('%d/%m/%Y lúc %H:%M') }}</p>
+        <p>Kết thúc: {{ event.end_time.strftime('%d/%m/%Y lúc %H:%M') }}</p>
+      </div>
+      <div class="mt-4">
+        <h3 class="font-bold">Địa điểm</h3>
+        <p>{{ event.location }}</p>
+      </div>
+      <div class="mt-4">
+        <h3 class="font-bold">Danh mục</h3>
+        <p>{{ event.category.value.title() if event.category else 'N/A' }}</p>
+      </div>
+      <div class="mt-4">
+        <h3 class="font-bold">Người tổ chức</h3>
+        <p>{{ event.organizer.username }}</p>
+      </div>
+      <div class="mt-4">
+        <h3 class="font-bold">Mô tả sự kiện</h3>
+        <p>{{ event.description }}</p>
+      </div>
     </div>
 
-    <!-- Reviews (full width dưới cùng) -->
-    {% if reviews or stats.average_rating > 0 %}
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="event-info-card">
-                <h4><i class="fas fa-comments me-2"></i>Đánh giá từ khách hàng</h4>
-                
-                <!-- Đánh giá trung bình - thiết kế mới -->
-                {% if stats.average_rating > 0 %}
-                <div class="rating-summary">
-                    <div class="rating-summary-content">
-                        <div class="rating-main">
-                            <div class="rating-number">{{ stats.average_rating }}</div>
-                            <div class="rating-details">
-                                <div class="rating-stars-compact">
-                                    {% for i in range(5) %}
-                                        {% if i < stats.average_rating %}
-                                            <i class="fas fa-star"></i>
-                                        {% else %}
-                                            <i class="far fa-star"></i>
-                                        {% endif %}
-                                    {% endfor %}
-                                </div>
-                                <p class="rating-text">Đánh giá trung bình</p>
-                            </div>
-                        </div>
-                        <div class="rating-count">
-                            <span class="rating-count-number">{{ stats.review_count }}</span>
-                            <div class="rating-count-label">đánh giá</div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                <!-- Danh sách reviews -->
-                {% if reviews %}
-                    {% for review in reviews %}
-                    <div class="review-card" id="review-{{ review.id }}">
-                        <div class="review-header">
-                            <div class="reviewer-info">
-                                <div class="reviewer-avatar">
-                                    {{ review.user.username[0].upper() }}
-                                </div>
-                                <div class="reviewer-details">
-                                    <p class="reviewer-name">
-                                        {{ review.user.username }}
-                                        {% if review.user.id == event.organizer.id %}
-                                            <span class="organizer-badge">BTC</span>
-                                        {% endif %}
-                                    </p>
-                                    <p class="review-date">{{ review.created_at.strftime('%d/%m/%Y lúc %H:%M') }}</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="review-rating">
-                            {% for i in range(5) %}
-                                {% if i < review.rating %}
-                                    <i class="fas fa-star"></i>
-                                {% else %}
-                                    <i class="far fa-star"></i>
-                                {% endif %}
-                            {% endfor %}
-                        </div>
-                        
-                        {% if review.comment %}
-                        <p class="mb-2">{{ review.comment }}</p>
-                        {% endif %}
-                        
-                        <!-- Replies -->
-                        {% if review.replies %}
-                            {% for reply in review.replies %}
-                            <div class="review-reply">
-                                <div class="review-header">
-                                    <div class="reviewer-info">
-                                        <div class="reviewer-avatar" style="width: 30px; height: 30px; font-size: 0.75rem;">
-                                            {{ reply.user.username[0].upper() }}
-                                        </div>
-                                        <div class="reviewer-details">
-                                            <p class="reviewer-name">
-                                                {{ reply.user.username }}
-                                                {% if reply.user.id == event.organizer.id %}
-                                                    <span class="organizer-badge">BTC</span>
-                                                {% endif %}
-                                            </p>
-                                            <p class="review-date">{{ reply.created_at.strftime('%d/%m/%Y lúc %H:%M') }}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                {% if reply.comment %}
-                                <p class="mb-0 mt-2">{{ reply.comment }}</p>
-                                {% endif %}
-                            </div>
-                            {% endfor %}
-                        {% endif %}
-                        
-                        <!-- Reply button - chỉ hiện cho staff và organizer -->
-                        {% if can_reply %}
-                        <div class="mt-2">
-                            <button class="reply-button" onclick="toggleReplyForm({{ review.id }})">
-                                <i class="fas fa-reply me-1"></i>Trả lời
-                            </button>
-                        </div>
-                        
-                        <!-- Reply form (hidden by default) -->
-                        <div id="reply-form-{{ review.id }}" class="reply-form mt-3" style="display: none;">
-                            <div class="row">
-                                <div class="col-12">
-                                    <textarea class="form-control" placeholder="Viết trả lời của bạn..." rows="3"></textarea>
-                                </div>
-                            </div>
-                            <div class="mt-2 d-flex gap-2">
-                                <button class="btn btn-primary btn-sm" onclick="submitReply({{ review.id }})">
-                                    <i class="fas fa-paper-plane me-1"></i>Gửi
-                                </button>
-                                <button class="btn btn-secondary btn-sm" onclick="toggleReplyForm({{ review.id }})">
-                                    Hủy
-                                </button>
-                            </div>
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                    
-                    {% if stats.review_count > 5 %}
-                    <div class="text-center">
-                        <button class="btn btn-outline-primary">
-                            Xem tất cả {{ stats.review_count }} đánh giá
-                        </button>
-                    </div>
-                    {% endif %}
-                {% else %}
-                    <p class="text-muted text-center mt-3">Chưa có đánh giá nào cho sự kiện này.</p>
-                {% endif %}
-                
-                <!-- Thông báo cho user chưa đăng nhập hoặc không có quyền -->
-                {% if not can_reply and not current_user %}
-                <div class="alert alert-info mt-3">
-                    <i class="fas fa-info-circle me-2"></i>
-                    <a href="/login">Đăng nhập</a> để có thể tương tác với đánh giá.
-                </div>
-                {% elif not can_reply and current_user %}
-                <div class="alert alert-secondary mt-3">
-                    <i class="fas fa-lock me-2"></i>
-                    Chỉ nhân viên và người tổ chức mới có thể trả lời đánh giá.
-                </div>
-                {% endif %}
-            </div>
+    <!-- Poster -->
+    <div>
+      {% if event.poster_url %}
+        <img src="{{ event.poster_url }}" alt="Poster" class="w-full rounded">
+      {% else %}
+        <div class="bg-gray-200 p-4 rounded text-center">
+          <p>Chưa có hình ảnh</p>
+          <p>Hình ảnh sự kiện sẽ được cập nhật sớm</p>
         </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Thông tin vé -->
+  {% if ticket_types %}
+  <div class="mt-8">
+    <h2 class="text-xl font-bold">Thông tin vé</h2>
+    <div class="grid grid-cols-3 gap-4 mb-4">
+      <div class="text-center">
+        <p class="text-2xl">{{ stats.total_tickets }}</p>
+        <p>Tổng vé</p>
+      </div>
+      <div class="text-center">
+        <p class="text-2xl">{{ stats.available_tickets }}</p>
+        <p>Còn lại</p>
+      </div>
+      <div class="text-center">
+        <p class="text-2xl">{{ "{:,.0f}".format(ticket_types|min(attribute='price')|attr('price')) }}đ</p>
+        <p>Giá từ</p>
+      </div>
+    </div>
+    {% for ticket_type in ticket_types %}
+    <div class="border p-4 rounded mb-4">
+      <h3 class="font-bold">{{ ticket_type.name }}</h3>
+      {% if ticket_type.description %}
+        <p>{{ ticket_type.description }}</p>
+      {% endif %}
+      <p class="text-lg">{{ "{:,.0f}".format(ticket_type.price) }}đ</p>
+      <p>Tổng: {{ ticket_type.total_quantity }} vé | Đã bán: {{ ticket_type.sold_quantity }} vé</p>
+      {% if ticket_type.is_sold_out %}
+        <p class="text-red-500">Hết vé</p>
+      {% else %}
+        <p class="text-green-500">Còn {{ ticket_type.available_quantity }} vé</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% if event.is_upcoming and stats.available_tickets > 0 %}
+      <a href="{{ url_for('book_event', event_id=event.id) }}" class="bg-blue-500 text-white px-4 py-2 rounded">Đặt Vé Ngay</a>
+    {% else %}
+      <p class="text-red-500">
+        {{ 'Sự kiện đã kết thúc' if event.is_past else 'Tất cả các loại vé đã hết' if stats.available_tickets == 0 else 'Hiện tại chưa thể đặt vé' }}
+      </p>
+    {% endif %}
+  {% else %}
+  <div class="mt-8 bg-gray-200 p-4 rounded">
+    <p>Chưa có thông tin vé</p>
+    <p>Người tổ chức chưa thiết lập các loại vé cho sự kiện này.</p>
+  </div>
+  {% endif %}
+
+  <!-- Đánh giá -->
+  {% if reviews or stats.average_rating > 0 %}
+  <div class="mt-8">
+    <h2 class="text-xl font-bold">Đánh giá từ khách hàng</h2>
+    {% if stats.average_rating > 0 %}
+    <div class="flex items-center mb-4">
+      <p class="text-2xl">{{ stats.average_rating }}</p>
+      <div class="ml-2">
+        {% for i in range(5) %}
+          <span class="{{ 'text-yellow-500' if i < stats.average_rating else 'text-gray-300' }}">★</span>
+        {% endfor %}
+      </div>
+      <p class="ml-2">{{ stats.review_count }} đánh giá</p>
     </div>
     {% endif %}
+    {% for review in reviews %}
+    <div class="border p-4 rounded mb-4">
+      <div class="flex items-center">
+        <span class="bg-blue-500 text-white rounded-full h-8 w-8 flex items-center justify-center">{{ review.user.username[0].upper() }}</span>
+        <div class="ml-2">
+          <p>{{ review.user.username }} {% if review.user.id == event.organizer.id %}(BTC){% endif %}</p>
+          <p class="text-sm">{{ review.created_at.strftime('%d/%m/%Y lúc %H:%M') }}</p>
+        </div>
+      </div>
+      <div class="flex mt-2">
+        {% for i in range(5) %}
+          <span class="{{ 'text-yellow-500' if i < review.rating else 'text-gray-300' }}">★</span>
+        {% endfor %}
+      </div>
+      {% if review.comment %}
+        <p class="mt-2">{{ review.comment }}</p>
+      {% endif %}
+      {% if review.replies %}
+        {% for reply in review.replies %}
+        <div class="ml-8 mt-4 border-l-2 pl-4">
+          <div class="flex items-center">
+            <span class="bg-blue-500 text-white rounded-full h-8 w-8 flex items-center justify-center">{{ reply.user.username[0].upper() }}</span>
+            <div class="ml-2">
+              <p>{{ reply.user.username }} {% if reply.user.id == event.organizer.id %}(BTC){% endif %}</p>
+              <p class="text-sm">{{ reply.created_at.strftime('%d/%m/%Y lúc %H:%M') }}</p>
+            </div>
+          </div>
+          {% if reply.comment %}
+            <p class="mt-2">{{ reply.comment }}</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% endif %}
+      {% if can_reply %}
+      <button onclick="showReplyForm('{{ review.id }}')" class="text-blue-500 mt-2">Trả lời</button>
+      <form id="reply-form-{{ review.id }}" class="hidden mt-2" method="POST" action="{{ url_for('add_review_reply', event_id=event.id, review_id=review.id) }}">
+        {{ form.hidden_tag() }}
+        <textarea name="comment" class="form-control w-full" placeholder="Nhập trả lời"></textarea>
+        <div class="mt-2">
+          <button type="submit" class="bg-blue-500 text-white px-2 py-1 rounded">Gửi</button>
+          <button type="button" onclick="hideReplyForm('{{ review.id }}')" class="bg-gray-300 text-black px-2 py-1 rounded">Hủy</button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% if stats.review_count > 5 %}
+      <a href="#" class="text-blue-500">Xem tất cả {{ stats.review_count }} đánh giá</a>
+    {% endif %}
+    {% if not can_reply and not current_user %}
+      <p class="mt-4">Đăng nhập để có thể tương tác với đánh giá.</p>
+    {% elif not can_reply and current_user %}
+      <p class="mt-4">Chỉ nhân viên và người tổ chức mới có thể trả lời đánh giá.</p>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
-    // Xử lý chia sẻ
-    $('.btn-outline-primary, .btn-outline-info, .btn-outline-success').click(function() {
-        console.log('Sharing event...');
-        alert('Chức năng chia sẻ sẽ được triển khai trong phiên bản tiếp theo!');
-    });
-});
-
-
-
-// Toggle reply form - chỉ hoạt động khi user có quyền
-function toggleReplyForm(reviewId) {
-    {% if can_reply %}
-    const form = document.getElementById(`reply-form-${reviewId}`);
-    if (form.style.display === 'none') {
-        form.style.display = 'block';
-        form.querySelector('textarea').focus();
-    } else {
-        form.style.display = 'none';
-        form.querySelector('textarea').value = '';
-    }
-    {% else %}
-    alert('Bạn không có quyền trả lời đánh giá.');
-    {% endif %}
-}
-
-// Handle reply submission (placeholder)
-function submitReply(reviewId) {
-    {% if can_reply %}
-    const textarea = document.querySelector(`#reply-form-${reviewId} textarea`);
-    const content = textarea.value.trim();
-    
-    if (!content) {
-        alert('Vui lòng nhập nội dung trả lời');
-        return;
-    }
-    
-    // TODO: Send AJAX request to submit reply
-    console.log('Submitting reply for review', reviewId, ':', content);
-    alert('Chức năng trả lời sẽ được triển khai trong phiên bản tiếp theo!');
-    
-    // Hide form and clear content
-    toggleReplyForm(reviewId);
-    {% else %}
-    alert('Bạn không có quyền trả lời đánh giá.');
-    {% endif %}
-}
+  function showReplyForm(reviewId) {
+    document.getElementById(`reply-form-${reviewId}`).classList.remove('hidden');
+  }
+  function hideReplyForm(reviewId) {
+    document.getElementById(`reply-form-${reviewId}`).classList.add('hidden');
+  }
 </script>
 {% endblock %}

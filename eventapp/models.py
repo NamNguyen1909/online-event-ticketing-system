@@ -177,7 +177,7 @@ class Event(db.Model):
     # Relationships
     organizer = relationship('User', back_populates='organized_events')
     tickets = relationship('Ticket', back_populates='event', lazy='dynamic')
-    ticket_types = relationship('TicketType', back_populates='event', lazy='dynamic')
+    ticket_types = relationship('TicketType', back_populates='event')
     reviews = relationship('Review', back_populates='event', lazy='dynamic')
     trending_log = relationship('EventTrendingLog', uselist=False, back_populates='event')
     
@@ -308,7 +308,7 @@ class TicketType(db.Model):
     event_id = db.Column(db.Integer, db.ForeignKey('events.id'), nullable=False)
     name = db.Column(db.String(100), nullable=False)  # VIP, Regular, Student, etc.
     description = db.Column(db.Text, nullable=True)
-    price = db.Column(db.Numeric(9, 2), nullable=False)
+    price = db.Column(db.Numeric(12, 2), nullable=False)
     total_quantity = db.Column(db.Integer, nullable=False)
     sold_quantity = db.Column(db.Integer, default=0, nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)

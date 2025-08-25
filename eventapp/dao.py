@@ -7,6 +7,7 @@ from eventapp.models import (
 )
 from eventapp import db
 from datetime import datetime
+from wtforms.validators import ValidationError
 
 def check_user(username):
     return User.query.filter(User.username == username).first()
@@ -68,15 +69,13 @@ def calculate_event_stats(active_ticket_types, all_reviews):
 
 def get_all_events_revenue_stats():
     """Lấy thống kê doanh thu cho tất cả sự kiện"""
-    events = db.session.query(Event).options(
-        joinedload(Event.ticket_types)
-    ).filter_by(is_active=True).all()
-
+    events = Event.query.filter_by(is_active=True).all()
     stats = []
     total_revenue = 0
     for event in events:
-        active_ticket_types = [tt for tt in event.ticket_types if tt.is_active]
-        stat = calculate_event_stats(active_ticket_types, event.reviews.all())
+        active_ticket_types = TicketType.query.filter_by(event_id=event.id, is_active=True).all()
+        all_reviews = Review.query.filter_by(event_id=event.id, parent_review_id=None).all()
+        stat = calculate_event_stats(active_ticket_types, all_reviews)
         stats.append({
             'event_id': event.id,
             'title': event.title,
@@ -86,7 +85,6 @@ def get_all_events_revenue_stats():
             'revenue': stat['revenue']
         })
         total_revenue += stat['revenue']
-    
     return stats, total_revenue
 
 def search_events(page=1, per_page=12, category='', search='', start_date='', end_date='', min_price=None, max_price=None):
@@ -297,3 +295,103 @@ def delete_event(event_id, user_id):
 def bulk_delete_events(event_ids, user_id):
     for event_id in event_ids:
         delete_event(event_id, user_id)
+
+def validate_ticket_types(ticket_types, event_id=None):
+    """Xác thực loại vé để tránh trùng lặp và kiểm tra ràng buộc"""
+    names = set()
+    for ticket in ticket_types:
+        if ticket['name'] in names:
+            raise ValidationError(f'Tên vé "{ticket["name"]}" bị trùng')
+        if ticket['price'] < 0:
+            raise ValidationError(f'Giá vé "{ticket["name"]}" phải không âm')
+        if ticket['total_quantity'] < 1:
+            raise ValidationError(f'Số lượng vé "{ticket["name"]}" phải ít nhất là 1')
+        if event_id and ticket.get('id'):
+            existing = TicketType.query.get(ticket['id'])
+            if existing and existing.event_id == event_id and ticket['total_quantity'] < existing.sold_quantity:
+                raise ValidationError(f'Không thể giảm số lượng vé dưới số vé đã bán cho "{ticket["name"]}"')
+        names.add(ticket['name'])
+    return True
+
+def create_event_with_tickets(data, user_id):
+    validate_ticket_types(data['ticket_types'])
+    event = Event(
+        organizer_id=user_id,
+        title=data['title'],
+        description=data['description'],
+        category=EventCategory[data['category']],
+        start_time=data['start_time'],
+        end_time=data['end_time'],
+        location=data['location'],
+        is_active=True
+    )
+    db.session.add(event)
+    db.session.flush()
+    for ticket_data in data['ticket_types']:
+        ticket_type = TicketType(
+            event_id=event.id,
+            name=ticket_data['name'],
+            price=ticket_data['price'],
+            total_quantity=ticket_data['total_quantity'],
+            sold_quantity=0,
+            is_active=True
+        )
+        db.session.add(ticket_type)
+    if data['poster']:
+        event.upload_poster(data['poster'])
+    db.session.commit()
+    return event
+
+def update_event_with_tickets(event_id, data, user_id):
+    validate_ticket_types(data['ticket_types'], event_id)
+    event = Event.query.get(event_id)
+    if not event or event.organizer_id != user_id:
+        raise ValueError('Sự kiện không tồn tại hoặc không thuộc quyền sở hữu')
+
+    # Cập nhật các trường của sự kiện
+    if 'title' in data and data['title']:
+        event.title = data['title']
+    if 'description' in data and data['description']:
+        event.description = data['description']
+    if 'category' in data and data['category']:
+        event.category = EventCategory[data['category']]
+    if 'start_time' in data and data['start_time']:
+        event.start_time = data['start_time']
+    if 'end_time' in data and data['end_time']:
+        event.end_time = data['end_time']
+    if 'location' in data and data['location']:
+        event.location = data['location']
+    if 'poster' in data and data['poster']:
+        event.upload_poster(data['poster'])
+
+    # Cập nhật loại vé
+    existing_ticket_ids = {tt.id: tt for tt in event.ticket_types}
+    new_ticket_ids = set()
+    for ticket_data in data.get('ticket_types', []):
+        ticket_id = ticket_data.get('id')
+        if ticket_id and ticket_id in existing_ticket_ids:
+            ticket = existing_ticket_ids[ticket_id]
+            ticket.name = ticket_data['name']
+            ticket.price = ticket_data['price']
+            if ticket_data['total_quantity'] < ticket.sold_quantity:
+                raise ValidationError(f'Không thể giảm số lượng vé dưới số vé đã bán cho {ticket.name}')
+            ticket.total_quantity = ticket_data['total_quantity']
+            new_ticket_ids.add(ticket_id)
+        else:
+            ticket = TicketType(
+                event_id=event.id,
+                name=ticket_data['name'],
+                price=ticket_data['price'],
+                total_quantity=ticket_data['total_quantity'],
+                sold_quantity=0,
+                is_active=True
+            )
+            db.session.add(ticket)
+
+    # Xóa các loại vé không còn trong danh sách
+    for ticket_id, ticket in existing_ticket_ids.items():
+        if ticket_id not in new_ticket_ids:
+            db.session.delete(ticket)
+
+    db.session.commit()
+    return event
