@@ -8,12 +8,9 @@ services:
   - type: web
     name: eventhub
     runtime: python
-    # workDir: .
     buildCommand: |
       cd eventapp
       pip install -r requirements.txt
-      ls -l eventapp/migrations
-      
       ls -l migrations
       flask db upgrade || { echo "[ERROR] DB upgrade failed"; exit 1; }
       cd ..
@@ -30,7 +27,7 @@ services:
       - key: FLASK_ENV
         value: production
       - key: FLASK_APP
-        value: eventapp:app
+        value: app
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
