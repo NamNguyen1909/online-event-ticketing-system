@@ -66,11 +66,49 @@ def events():
     search = request.args.get('search', '')
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
-    min_price = request.args.get('min_price', type=float)
-    max_price = request.args.get('max_price', type=float)
+    location = request.args.get('location', '')
+    price_min = request.args.get('price_min', type=float)
+    price_max = request.args.get('price_max', type=float)
+    quick_date = request.args.get('quick_date', '')
+    free = request.args.get('free', '')
 
-    events = dao.search_events(page, 12, category, search, start_date, end_date, min_price, max_price)
-    return render_template('customer/EventList.html', events=events)
+    # Xử lý quick_date (nếu muốn giữ các nút nhanh)
+    from datetime import datetime, timedelta
+    today = datetime.today()
+    if quick_date == 'today':
+        start_date = today.strftime('%Y-%m-%d')
+        end_date = today.strftime('%Y-%m-%d')
+    elif quick_date == 'tomorrow':
+        tomorrow = today + timedelta(days=1)
+        start_date = tomorrow.strftime('%Y-%m-%d')
+        end_date = tomorrow.strftime('%Y-%m-%d')
+    elif quick_date == 'weekend':
+        # Tìm ngày thứ 7 và CN gần nhất
+        saturday = today + timedelta((5 - today.weekday()) % 7)
+        sunday = saturday + timedelta(days=1)
+        start_date = saturday.strftime('%Y-%m-%d')
+        end_date = sunday.strftime('%Y-%m-%d')
+    elif quick_date == 'month':
+        start_date = today.replace(day=1).strftime('%Y-%m-%d')
+        # Tìm ngày cuối tháng
+        next_month = today.replace(day=28) + timedelta(days=4)
+        last_day = next_month - timedelta(days=next_month.day)
+        end_date = last_day.strftime('%Y-%m-%d')
+
+    # Xử lý miễn phí
+    if free:
+        price_max = 0
+
+    # Lấy danh sách thể loại cho dropdown
+    from eventapp.models import EventCategory
+    categories = list(EventCategory)
+
+    events = dao.search_events(page, 12, category, search, start_date, end_date, location, price_min, price_max)
+    category_title = None
+    if category:
+        from eventapp.dao import get_category_title
+        category_title = get_category_title(category)
+    return render_template('customer/EventList.html', events=events, categories=categories, category_title=category_title)
 
 @app.route('/trending')
 def trending():
@@ -86,13 +124,16 @@ def category(category):
     events = dao.get_events_by_category(category)
     if events is None:
         abort(404)
-    
+
     category_title = dao.get_category_title(category)
-    
+    from eventapp.models import EventCategory
+    categories = list(EventCategory)
+
     return render_template('customer/EventList.html', 
                   events=events, 
                   category=category,
-                  category_title=category_title)
+                  category_title=category_title,
+                  categories=categories)
 
 @app.route('/support')
 def support():

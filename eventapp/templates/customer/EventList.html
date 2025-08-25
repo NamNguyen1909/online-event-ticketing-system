@@ -12,25 +12,175 @@
         </ol>
     </nav>
 
-    <h2 class="event-list-title">
-        {% if category_title %}
-            {{ category_title }}
-        {% else %}
-            Danh sách sự kiện
-        {% endif %}
-    </h2>
+    <!-- Tiêu đề -->
+    <h2 class="event-list-title">{{ category_title if category_title else 'Danh sách sự kiện' }}</h2>
 
-    <!-- Form tìm kiếm nổi bật -->
-    <form action="{{ url_for('events') }}" method="get" class="event-list-search row justify-content-center g-2 mb-4">
+    <!-- Thanh tìm kiếm sự kiện -->
+    <form action="{{ url_for('events') }}" method="get" class="event-list-search row justify-content-center align-items-center g-2 mb-4">
         <div class="col-md-6 col-lg-5">
-            <input type="text" name="search" class="form-control form-control-lg" placeholder="Tìm kiếm sự kiện..." value="{{ request.args.get('search', '') }}">
+            <input type="text" name="search" class="form-control form-control-sm py-2" style="height:40px;" placeholder="Tìm kiếm sự kiện..." value="{{ request.args.get('search', '') }}">
         </div>
-        <div class="col-md-2 col-lg-2">
-            <button type="submit" class="btn btn-primary btn-lg w-100">
-                <i class="fas fa-search me-2"></i>Tìm kiếm
+        <div class="col-md-2 col-lg-2 d-flex align-items-center gap-2" style="height:40px;">
+            <button type="submit" class="btn btn-primary btn-sm w-100 d-flex align-items-center justify-content-center" style="height:40px;">
+                <i class="fas fa-search me-2"></i><span class="d-inline">Tìm kiếm</span>
+            </button>
+            <!-- Nút phiễu (filter) với chữ Bộ lọc, giao diện giống nút tìm kiếm, nằm bên phải -->
+            <button type="button" id="toggleFilterBtn" class="btn btn-primary btn-sm w-100 d-flex align-items-center justify-content-center" style="height:40px;" title="Bộ lọc sự kiện">
+                <i class="fas fa-filter me-2"></i><span class="d-inline">Bộ lọc</span>
             </button>
         </div>
     </form>
+
+        <!-- Bộ lọc sự kiện (ẩn mặc định, hiệu ứng mở/đóng) -->
+        <style>
+        #eventFilterCard {
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(-20px);
+            box-shadow: none;
+            border-top: 3px solid #0d6efd; /* Màu giống nút bộ lọc */
+            transition:
+                max-height 0.4s cubic-bezier(.4,0,.2,1),
+                opacity 0.3s ease,
+                transform 0.4s cubic-bezier(.4,0,.2,1),
+                box-shadow 0.3s;
+        }
+        #eventFilterCard.show {
+            max-height: 1000px;
+            opacity: 1;
+            transform: translateY(0);
+            box-shadow: 0 4px 16px rgba(13,110,253,0.15); /* Shadow màu liên kết nút bộ lọc */
+            border-top: 3px solid #0d6efd;
+            transition:
+                max-height 0.4s cubic-bezier(.4,0,.2,1),
+                opacity 0.3s ease,
+                transform 0.4s cubic-bezier(.4,0,.2,1),
+                box-shadow 0.3s;
+        }
+        </style>
+        <div class="event-filter-card card mb-4 p-3" id="eventFilterCard">
+        <form action="{{ url_for('events') }}" method="get" class="row g-3 align-items-center">
+            <div class="col-md-3">
+                <label class="form-label fw-bold mb-2">Thời gian</label>
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <label for="start_date" class="form-label">Từ ngày</label>
+                        <input type="date" name="start_date" id="start_date" class="form-control rounded-pill" value="{{ request.args.get('start_date', '') }}">
+                    </div>
+                    <div class="col-6">
+                        <label for="end_date" class="form-label">Đến ngày</label>
+                        <input type="date" name="end_date" id="end_date" class="form-control rounded-pill" value="{{ request.args.get('end_date', '') }}">
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold mb-2">Vị trí</label>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    <input type="radio" name="location" id="loc_all" value="" class="btn-check" autocomplete="off" {% if not request.args.get('location') %}checked{% endif %}>
+                    <label for="loc_all" class="btn btn-outline-secondary btn-sm rounded-pill filter-btn">Toàn quốc</label>
+                    <input type="radio" name="location" id="loc_hcm" value="Hồ Chí Minh" class="btn-check" autocomplete="off" {% if request.args.get('location') == 'Hồ Chí Minh' %}checked{% endif %}>
+                    <label for="loc_hcm" class="btn btn-outline-secondary btn-sm rounded-pill filter-btn">Hồ Chí Minh</label>
+                    <input type="radio" name="location" id="loc_hn" value="Hà Nội" class="btn-check" autocomplete="off" {% if request.args.get('location') == 'Hà Nội' %}checked{% endif %}>
+                    <label for="loc_hn" class="btn btn-outline-secondary btn-sm rounded-pill filter-btn">Hà Nội</label>
+                    <input type="radio" name="location" id="loc_dl" value="Đà Lạt" class="btn-check" autocomplete="off" {% if request.args.get('location') == 'Đà Lạt' %}checked{% endif %}>
+                    <label for="loc_dl" class="btn btn-outline-secondary btn-sm rounded-pill filter-btn">Đà Lạt</label>
+                    <input type="radio" name="location" id="loc_other" value="Vị trí khác" class="btn-check" autocomplete="off" {% if request.args.get('location') == 'Vị trí khác' %}checked{% endif %}>
+                    <label for="loc_other" class="btn btn-outline-secondary btn-sm rounded-pill filter-btn">Vị trí khác</label>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-bold mb-2">Giá tiền</label>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" name="free" id="free" value="1" {% if request.args.get('free') %}checked{% endif %}>
+                    <label class="form-check-label" for="free"><i class="fas fa-money-bill-wave me-1"></i>Miễn phí</label>
+                </div>
+                <input type="text" name="price_min" id="price_min" class="form-control rounded-pill mb-1" placeholder="Giá từ" value="{{ request.args.get('price_min', '') }}">
+                <input type="text" name="price_max" id="price_max" class="form-control rounded-pill" placeholder="Đến" value="{{ request.args.get('price_max', '') }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-bold mb-2">Thể loại</label>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for cat in categories %}
+                        <input type="radio" name="category" id="cat_{{ cat.value }}" value="{{ cat.value }}" class="btn-check" autocomplete="off"
+                        {% if category == cat.value %}checked{% elif request.args.get('category') == cat.value %}checked{% endif %}>
+                        <label for="cat_{{ cat.value }}" class="btn btn-outline-info btn-sm rounded-pill filter-btn mb-1">{{ cat.value.title() }}</label>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-md-12 mt-3 d-flex justify-content-end gap-2">
+                <button type="button" id="resetFilterBtn" class="btn btn-outline-success rounded-pill px-4">Thiết lập lại</button>
+                <button type="submit" class="btn btn-outline-success rounded-pill px-4">Áp dụng</button>
+            </div>
+        </form>
+        <!-- Script xử lý sự kiện -->
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                // Hiệu ứng mở/đóng bộ lọc từ vị trí nút bộ lọc
+                var filterBtn = document.getElementById('toggleFilterBtn');
+                var filterCard = document.getElementById('eventFilterCard');
+                if (filterBtn && filterCard) {
+                    filterBtn.addEventListener('click', function() {
+                        filterCard.classList.toggle('show');
+                        if (filterCard.classList.contains('show')) {
+                            filterBtn.classList.add('active');
+                        } else {
+                            filterBtn.classList.remove('active');
+                        }
+                    });
+                }
+
+                // Xử lý nút Thiết lập lại bộ lọc
+                var resetBtn = document.getElementById('resetFilterBtn');
+                var filterForm = filterCard ? filterCard.querySelector('form') : null;
+                if (resetBtn && filterForm) {
+                    resetBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        // Reset các trường bộ lọc, giữ nguyên các trường khác ngoài bộ lọc
+                        // Thời gian
+                        filterForm.querySelector('[name="start_date"]').value = '';
+                        filterForm.querySelector('[name="end_date"]').value = '';
+                        // Vị trí
+                        var locationRadios = filterForm.querySelectorAll('input[name="location"]');
+                        locationRadios.forEach(function(radio) { radio.checked = false; });
+                        // Giá tiền
+                        filterForm.querySelector('[name="price_min"]').value = '';
+                        filterForm.querySelector('[name="price_max"]').value = '';
+                        var freeCheckbox = filterForm.querySelector('[name="free"]');
+                        if (freeCheckbox) {
+                            freeCheckbox.checked = false;
+                            filterForm.querySelector('[name="price_min"]').disabled = false;
+                            filterForm.querySelector('[name="price_max"]').disabled = false;
+                        }
+                        // Danh mục
+                        var categoryRadios = filterForm.querySelectorAll('input[name="category"]');
+                        categoryRadios.forEach(function(radio) { radio.checked = false; });
+                    });
+                }
+
+                // Xử lý disable input giá khi chọn miễn phí
+                var freeCheckbox = document.getElementById('free');
+                var priceMin = document.getElementById('price_min');
+                var priceMax = document.getElementById('price_max');
+                function setPriceInputsState(disabled) {
+                    if (priceMin) {
+                        priceMin.value = disabled ? '' : priceMin.value;
+                        priceMin.disabled = disabled;
+                    }
+                    if (priceMax) {
+                        priceMax.value = disabled ? '' : priceMax.value;
+                        priceMax.disabled = disabled;
+                    }
+                }
+                if (freeCheckbox) {
+                    setPriceInputsState(freeCheckbox.checked);
+                    freeCheckbox.addEventListener('change', function() {
+                        setPriceInputsState(freeCheckbox.checked);
+                    });
+                }
+            });
+            </script>
+    </div>
 
     {% if events.items is defined %}
         {% set event_list = events.items %}
@@ -98,6 +248,99 @@
 
 {% block extra_css %}
 <style>
+    .event-filter-card {
+        background: #f8f9fa;
+        border-radius: 18px;
+        margin-bottom: 24px;
+        padding: 24px 32px;
+    }
+    .filter-btn {
+        transition: all 0.2s;
+        font-weight: 500;
+        border-radius: 20px !important;
+        min-width: 90px;
+        margin-bottom: 6px;
+    }
+    .filter-btn:hover, .filter-btn:focus {
+        box-shadow: 0 2px 8px rgba(52,152,219,0.13);
+        background: #eaf6fb;
+        color: #3498db;
+    }
+    .btn-check:checked + .filter-btn, .btn-check:checked + .btn {
+        background: #3498db;
+        color: #fff;
+        border-color: #3498db;
+    }
+    .form-control.rounded-pill {
+        border-radius: 20px;
+        padding-left: 18px;
+    }
+    .form-label.fw-bold {
+        color: #2980b9;
+        font-size: 1.05rem;
+    }
+    @media (max-width: 768px) {
+        .event-filter-card {
+            padding: 12px 8px;
+        }
+        .filter-btn {
+            min-width: 70px;
+            font-size: 0.95rem;
+        }
+    }
+    /* Ẩn radio mặc định cho filter */
+    .btn-check {
+        position: absolute;
+        clip: rect(0,0,0,0);
+        pointer-events: none;
+    }
+    .event-filter-card {
+        background: transparent;
+        border-radius: 18px;
+        box-shadow: none;
+        margin-bottom: 24px;
+        padding: 24px 32px;
+    }
+    .filter-btn {
+        transition: all 0.2s;
+        font-weight: 500;
+        border-radius: 20px !important;
+        min-width: 90px;
+        margin-bottom: 6px;
+    }
+    .filter-btn:hover, .filter-btn:focus {
+        box-shadow: 0 2px 8px rgba(52,152,219,0.13);
+        background: #eaf6fb;
+        color: #3498db;
+    }
+    .btn-check:checked + .filter-btn, .btn-check:checked + .btn {
+        background: #3498db;
+        color: #fff;
+        border-color: #3498db;
+    }
+    .form-control.rounded-pill {
+        border-radius: 20px;
+        padding-left: 18px;
+    }
+    .form-label.fw-bold {
+        color: #2980b9;
+        font-size: 1.05rem;
+    }
+    @media (max-width: 768px) {
+        .event-filter-card {
+            padding: 12px 8px;
+        }
+        .filter-btn {
+            min-width: 70px;
+            font-size: 0.95rem;
+        }
+    }
+    /* Ẩn radio mặc định cho filter */
+    .btn-check {
+        position: absolute;
+        clip: rect(0,0,0,0);
+        pointer-events: none;
+    }
     .event-list-title {
         color: #2c3e50;
         font-size: 2rem;
@@ -193,11 +436,11 @@
         box-shadow: 0 6px 20px rgba(52,152,219,0.18);
     }
     .event-list-search {
-        background: #f8f9fa;
+        background: transparent;
         border-radius: 12px;
-        padding: 18px 24px;
+        padding: 0;
         margin-bottom: 24px;
-        box-shadow: 0 2px 8px rgba(52,152,219,0.07);
+        box-shadow: none;
     }
     @media (max-width: 768px) {
         .event-list-title {
