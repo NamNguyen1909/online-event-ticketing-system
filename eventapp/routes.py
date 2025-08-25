@@ -174,8 +174,8 @@ def profile():
 @app.route('/my-tickets')
 @login_required
 def my_tickets():
-    tickets = dao.get_user_tickets(current_user.id)
-    return render_template('my_tickets.html', tickets=tickets)
+    tickets = Ticket.query.filter_by(user_id=current_user.id, is_paid=True).order_by(Ticket.purchase_date.desc()).all()
+    return render_template('customer/MyTickets.html', tickets=tickets)
 
 @app.route('/my-events')
 @login_required
