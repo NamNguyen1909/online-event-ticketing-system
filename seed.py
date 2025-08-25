@@ -374,49 +374,70 @@ def create_event_trending_logs(events):
 
 def seed_database():
     """Chạy toàn bộ quá trình seed database"""
-    print("🌱 Bắt đầu seed database...")
-    
-    # Xóa dữ liệu cũ
-    print("🧹 Xóa dữ liệu cũ...")
-    db.drop_all()
-    db.create_all()
-    
-    # Tạo dữ liệu
-    print("👥 Tạo users...")
-    users = create_users(50)
-    
-    print("🎉 Tạo events...")
-    events = create_events(users, 30)
-    
-    print("🎫 Tạo ticket types...")
-    ticket_types = create_ticket_types(events)
-    
-    print("🏷️ Tạo discount codes...")
-    discount_codes = create_discount_codes(15)
-    
-    print("💳 Tạo tickets và payments...")
-    tickets, payments = create_tickets_and_payments(users, ticket_types, discount_codes, 300)
-    
-    print("⭐ Tạo reviews...")
-    reviews = create_reviews(users, events, 150)
-    
-    print("📢 Tạo notifications...")
-    notifications, user_notifications = create_notifications_and_user_notifications(users, events, 25)
-    
-    print("📊 Tạo trending logs...")
-    trending_logs = create_event_trending_logs(events)
-    
-    print("✅ Seed database hoàn thành!")
-    print(f"📊 Tạo thành công:")
-    print(f"   - {len(users)} users")
-    print(f"   - {len(events)} events") 
-    print(f"   - {len(ticket_types)} ticket types")
-    print(f"   - {len(tickets)} tickets")
-    print(f"   - {len(payments)} payments")
-    print(f"   - {len(reviews)} reviews")
-    print(f"   - {len(notifications)} notifications")
-    print(f"   - {len(user_notifications)} user notifications")
-    print(f"   - {len(trending_logs)} trending logs")
+    try:
+        print("🌱 Bắt đầu seed database...")
+        
+        # Kiểm tra xem đã có dữ liệu chưa
+        existing_users = User.query.first()
+        if existing_users:
+            print("📊 Database đã có dữ liệu, bỏ qua seed")
+            return
+        
+        print("🧹 Xóa dữ liệu cũ...")
+        # Xóa từng bảng một cách an toàn
+        UserNotification.query.delete()
+        Notification.query.delete()
+        Review.query.delete()
+        EventTrendingLog.query.delete()
+        Ticket.query.delete()
+        Payment.query.delete()
+        TicketType.query.delete()
+        DiscountCode.query.delete()
+        Event.query.delete()
+        User.query.delete()
+        db.session.commit()
+        
+        # Tạo dữ liệu mới
+        print("👥 Tạo users...")
+        users = create_users(50)
+        
+        print("🎉 Tạo events...")
+        events = create_events(users, 30)
+        
+        print("🎫 Tạo ticket types...")
+        ticket_types = create_ticket_types(events)
+        
+        print("🏷️ Tạo discount codes...")
+        discount_codes = create_discount_codes(15)
+        
+        print("💳 Tạo tickets và payments...")
+        tickets, payments = create_tickets_and_payments(users, ticket_types, discount_codes, 300)
+        
+        print("⭐ Tạo reviews...")
+        reviews = create_reviews(users, events, 150)
+        
+        print("📢 Tạo notifications...")
+        notifications, user_notifications = create_notifications_and_user_notifications(users, events, 25)
+        
+        print("📊 Tạo trending logs...")
+        trending_logs = create_event_trending_logs(events)
+        
+        print("✅ Seed database hoàn thành!")
+        print(f"📊 Tạo thành công:")
+        print(f"   - {len(users)} users")
+        print(f"   - {len(events)} events") 
+        print(f"   - {len(ticket_types)} ticket types")
+        print(f"   - {len(tickets)} tickets")
+        print(f"   - {len(payments)} payments")
+        print(f"   - {len(reviews)} reviews")
+        print(f"   - {len(notifications)} notifications")
+        print(f"   - {len(user_notifications)} user notifications")
+        print(f"   - {len(trending_logs)} trending logs")
+        
+    except Exception as e:
+        print(f"❌ Lỗi khi seed database: {e}")
+        db.session.rollback()
+        raise e
 
 def create_app():
     """Tạo Flask app cho việc seeding"""

@@ -7,14 +7,17 @@ databases:
 services:
   - type: web
     name: eventhub
-    runtime: python3
+    runtime: python
     buildCommand: |
       pip install -r requirements.txt
-      flask db init || true
-      flask db migrate -m "Initial migration" || true
+      export FLASK_APP=eventapp
+      cd eventapp
       flask db upgrade
+      flask db migrate -m "autoDeploy" || true
+      flask db upgrade
+      cd ..
       python seed.py
-    startCommand: python index.py
+    startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT eventapp:app
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -25,13 +28,13 @@ services:
       - key: FLASK_ENV
         value: production
       - key: FLASK_APP
-        value: index.py
+        value: eventapp
       - key: CLOUDINARY_CLOUD_NAME
-        value: os.getenv('CLOUDINARY_CLOUD_NAME', 'your_cloudinary_cloud_name')
+        sync: false
       - key: CLOUDINARY_API_KEY
-        value: os.getenv('CLOUDINARY_API_KEY', 'your_cloudinary_api_key')
+        sync: false
       - key: CLOUDINARY_API_SECRET
-        value: os.getenv('CLOUDINARY_API_SECRET', 'your_cloudinary_api_secret')
+        sync: false
     plan: free
     healthCheckPath: /
-    autoDeploy: false
+    autoDeploy: true
