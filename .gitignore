@@ -193,3 +193,7 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 .DS_Store
+
+# Ignore Copilot instructions but not workflows
+.github/copilot-instructions.md
+!.github/workflows/ci.yml
