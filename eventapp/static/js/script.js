@@ -317,6 +317,31 @@ document.querySelectorAll('form').forEach(form => {
     });
 });
 
+// Format giá tiền có dấu chấm phân cách
+function formatPriceInput(input) {
+    input.addEventListener('input', function(e) {
+        let value = input.value.replace(/\D/g, '');
+        if (value) {
+            input.value = value.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        } else {
+            input.value = '';
+        }
+    });
+    input.addEventListener('blur', function(e) {
+        let value = input.value.replace(/\D/g, '');
+        if (value) {
+            input.value = value.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var priceMin = document.getElementById('price_min');
+    var priceMax = document.getElementById('price_max');
+    if (priceMin) formatPriceInput(priceMin);
+    if (priceMax) formatPriceInput(priceMax);
+});
+
 // Export functions for use in other scripts
 window.EventHub = {
     showAlert,
