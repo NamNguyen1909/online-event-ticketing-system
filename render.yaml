@@ -13,6 +13,8 @@ services:
       pip install -r requirements.txt
     releaseCommand: |
       cd eventapp
+      flask db init || echo "DB already initialized"
+      flask db migrate -m "initial" || echo "No changes in migration"
       flask db upgrade || { echo "DB upgrade failed"; exit 1; }
       cd ..
       python seed.py
