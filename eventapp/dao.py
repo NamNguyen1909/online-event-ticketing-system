@@ -296,14 +296,16 @@ def vnpay_redirect_flask():
     
 
     payment = Payment.query.filter_by(transaction_id=vnp_TxnRef).first()
-    if payment:
-        event_id=payment.event_id
+
 
     if payment and payment_success:
         payment.status = True
         payment.paid_at = datetime.utcnow()
         # Cập nhật các ticket liên quan
         tickets = Ticket.query.filter_by(payment_id=payment.id, user_id=payment.user_id, is_paid=False).all()
+
+        if tickets:
+            event_id = tickets[0].event_id
         for ticket in tickets:
             ticket.is_paid = True
             ticket.purchase_date = datetime.utcnow()
@@ -321,7 +323,7 @@ def vnpay_redirect_flask():
             notification_type="payment"
         )
         # Cập nhật thông tin người dùng và sự kiện sau khi thanh toán
-        update_user_and_event_after_payment(payment.user_id, event_id, float(payment.amount))
+        update_user_and_event_after_payment(payment.user_id, event_id, payment.amount)
         
         db.session.add(notif)
         db.session.flush()
