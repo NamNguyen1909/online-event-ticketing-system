@@ -66,7 +66,7 @@ def calculate_event_stats(active_ticket_types, all_reviews):
         'review_count': len(all_reviews)
     }
 
-def search_events(page=1, per_page=12, category='', search='', start_date='', end_date='', min_price=None, max_price=None):
+def search_events(page=1, per_page=12, category='', search='', start_date='', end_date='', location='', price_min=None, price_max=None):
     """Tìm kiếm và lọc sự kiện"""
     query = Event.query.filter_by(is_active=True)
 
@@ -76,24 +76,31 @@ def search_events(page=1, per_page=12, category='', search='', start_date='', en
     if search:
         query = query.filter(Event.title.ilike(f'%{search}%'))
 
+    from datetime import datetime
     if start_date:
         try:
             start_dt = datetime.strptime(start_date, '%Y-%m-%d')
             query = query.filter(Event.start_time >= start_dt)
         except:
             pass
-
     if end_date:
         try:
             end_dt = datetime.strptime(end_date, '%Y-%m-%d')
-            query = query.filter(Event.end_time <= end_dt)
+            query = query.filter(Event.start_time <= end_dt)
         except:
             pass
 
-    if min_price is not None:
-        query = query.join(Event.ticket_types).filter(TicketType.price >= min_price)
-    if max_price is not None:
-        query = query.join(Event.ticket_types).filter(TicketType.price <= max_price)
+    if location:
+        query = query.filter(Event.location.ilike(f'%{location}%'))
+
+    if price_min is not None:
+        query = query.join(Event.ticket_types).filter(TicketType.price >= price_min)
+    if price_max is not None:
+        # Nếu lọc miễn phí, chỉ lấy sự kiện có vé giá 0
+        if price_max == 0:
+            query = query.join(Event.ticket_types).filter(TicketType.price == 0)
+        else:
+            query = query.join(Event.ticket_types).filter(TicketType.price <= price_max)
 
     return query.order_by(Event.start_time.desc()).paginate(
         page=page, per_page=per_page, error_out=False
