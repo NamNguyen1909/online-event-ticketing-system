@@ -6,7 +6,7 @@
     <table class="table table-bordered">
         <thead>
             <tr>
-                <th>Mã vé</th>
+                <th>QR Code</th>
                 <th>Sự kiện</th>
                 <th>Loại vé</th>
                 <th>Ngày mua</th>
@@ -16,7 +16,13 @@
         <tbody>
             {% for ticket in tickets %}
             <tr>
-                <td>{{ ticket.uuid }}</td>
+                <td>
+                        {% if ticket.qr_code %}
+                            <img src="{{ ticket.qr_code_url }}" alt="QR Code" width="80" height="80" class="qr-thumbnail" style="cursor:pointer" data-qr-url="{{ ticket.qr_code_url }}" />
+                        {% else %}
+                            Không có QR
+                        {% endif %}
+                </td>
                 <td>{{ ticket.event.title if ticket.event else 'N/A' }}</td>
                 <td>{{ ticket.ticket_type.name if ticket.ticket_type else 'N/A' }}</td>
                 <td>{{ ticket.purchase_date.strftime('%d/%m/%Y %H:%M') if ticket.purchase_date else 'N/A' }}</td>
@@ -29,4 +35,36 @@
     <div class="alert alert-info">Bạn chưa có vé nào đã thanh toán thành công.</div>
     {% endif %}
 </div>
+    <!-- Modal hiển thị QR lớn -->
+    <div class="modal fade" id="qrModal" tabindex="-1" aria-labelledby="qrModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="qrModalLabel">Quét mã QR vé</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="qrLargeImg" src="" alt="QR Code lớn" style="max-width:100%;height:auto;" />
+                </div>
+            </div>
+        </div>
+    </div>
+    {% block extra_js %}
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var qrModalEl = document.getElementById('qrModal');
+        var qrModal = bootstrap.Modal.getOrCreateInstance(qrModalEl);
+        document.querySelectorAll('.qr-thumbnail').forEach(function(img) {
+            img.addEventListener('click', function() {
+                var qrUrl = this.getAttribute('data-qr-url');
+                document.getElementById('qrLargeImg').setAttribute('src', qrUrl);
+                qrModal.show();
+            });
+        });
+        qrModalEl.addEventListener('hidden.bs.modal', function () {
+            document.getElementById('qrLargeImg').setAttribute('src', '');
+        });
+    });
+    </script>
+    {% endblock %}
 {% endblock %}

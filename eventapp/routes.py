@@ -174,7 +174,7 @@ def profile():
 @app.route('/my-tickets')
 @login_required
 def my_tickets():
-    tickets = Ticket.query.filter_by(user_id=current_user.id, is_paid=True).all()
+    tickets = Ticket.query.filter_by(user_id=current_user.id, is_paid=True).order_by(Ticket.purchase_date.desc()).all()
     return render_template('customer/MyTickets.html', tickets=tickets)
 
 @app.route('/my-events')
