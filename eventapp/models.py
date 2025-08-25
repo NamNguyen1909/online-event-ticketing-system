@@ -84,7 +84,7 @@ class User(db.Model, UserMixin):
             # Upload new avatar
             result = cloudinary.uploader.upload(
                 file,
-                folder='avatars',
+                folder='online-event-ticketing-system/users/avatars',
                 public_id=f"user_{self.id}_{uuid.uuid4().hex[:8]}",
                 overwrite=True,
                 resource_type='image'
@@ -205,7 +205,7 @@ class Event(db.Model):
             # Upload new poster
             result = cloudinary.uploader.upload(
                 file,
-                folder='event_posters',
+                folder='online-event-ticketing-system/events/posters',
                 public_id=f"event_{self.id}_{uuid.uuid4().hex[:8]}",
                 overwrite=True,
                 resource_type='image'
@@ -378,47 +378,47 @@ class Ticket(db.Model):
         return None
 
     def generate_qr_code(self, qr_code_data=None):
-        """Generate and upload QR code to Cloudinary"""
+        """Generate and upload QR code to Cloudinary using uuid"""
         try:
             import qrcode
             from io import BytesIO
-            
+
+            # Use uuid as QR data if not provided
             if not qr_code_data:
                 qr_code_data = self.uuid
-            
-            # Generate QR code
+
+            # Generate QR code image
             qr = qrcode.QRCode(
-                version=1, 
-                error_correction=qrcode.constants.ERROR_CORRECT_L, 
-                box_size=10, 
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
                 border=4
             )
             qr.add_data(qr_code_data)
             qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            buffer = BytesIO()
+            img.save(buffer, format="PNG")
+            buffer.seek(0)
 
-            qr_image = qr.make_image(fill_color="black", back_color="white")
-            img_buffer = BytesIO()
-            qr_image.save(img_buffer, format='PNG')
-            img_buffer.seek(0)
-
-            # Delete old QR code if exists
+            # Remove old QR code if exists
             if self.qr_code:
+                import cloudinary.uploader
                 cloudinary.uploader.destroy(self.qr_code)
 
             # Upload to Cloudinary
+            import cloudinary.uploader
             result = cloudinary.uploader.upload(
-                img_buffer.getvalue(),
-                folder='qr_codes',
-                public_id=f"qr_ticket_{self.id}_{uuid.uuid4().hex[:8]}",
+                buffer.getvalue(),
+                folder="online-event-ticketing-system/tickets/qr_codes",
+                public_id=f"qr_ticket_{self.id}_{self.uuid}",
                 overwrite=True,
-                resource_type='image'
+                resource_type="image"
             )
-            
-            # Lưu public_id vào database
-            self.qr_code = result['public_id']
+            self.qr_code = result["public_id"]
             return result
         except Exception as e:
-            print(f"Error generating QR code: {e}")
+            print(f"Error generating QR code for ticket {self.id}: {e}")
             return None
 
     def delete_qr_code(self):
