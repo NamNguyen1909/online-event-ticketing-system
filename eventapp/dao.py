@@ -324,9 +324,61 @@ def vnpay_redirect_flask():
             message=f"Bạn đã thanh toán thành công đơn hàng {payment.transaction_id}.",
             notification_type="payment"
         )
+        # Gửi email vé cho user
+        from eventapp.utils import send_ticket_email
+        user = payment.user
+        ticket_infos = []
+        for ticket in tickets:
+            ticket_infos.append({
+                'event_title': ticket.event.title if ticket.event else '',
+                'ticket_type': ticket.ticket_type.name if ticket.ticket_type else '',
+                'qr_code_url': ticket.qr_code_url,
+                'uuid': ticket.uuid
+            })
+        email_subject = f"Vé điện tử cho đơn hàng {payment.transaction_id}"
+        # Tạo nội dung HTML đẹp, thân thiện
+        html_body = f"""
+        <div style='font-family:sans-serif;max-width:80%;margin:auto;background:#f9f9f9;border-radius:10px;padding:32px 24px 24px 24px;'>
+            <div style='text-align:center;'>
+                <h1 style='color:#2d8cf0;margin-bottom:8px;'>🎫 Vé điện tử của bạn</h1>
+                <p style='font-size:18px;margin:0 0 12px 0;'>Cảm ơn bạn đã đặt vé tại <b>Event Hub</b>!</p>
+                <p style='font-size:16px;margin:0 0 18px 0;'>Mã đơn hàng: <span style='color:#2d8cf0;font-weight:bold'>{payment.transaction_id}</span></p>
+            </div>
+            <table style='width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;'>
+                <thead>
+                    <tr style='background:#2d8cf0;color:#fff;'>
+                        <th style='padding:10px 6px;'>Sự kiện</th>
+                        <th style='padding:10px 6px;'>Loại vé</th>
+                        <th style='padding:10px 6px;'>Mã QR</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join([
+                        f"<tr style='border-bottom:1px solid #eee;'>"
+                        f"<td style='padding:10px 6px;font-weight:500;'>{t['event_title']}</td>"
+                        f"<td style='padding:10px 6px;'>{t['ticket_type']}</td>"
+                        f"<td style='padding:10px 6px;text-align:center;'><img src='{t['qr_code_url']}' width='120' style='border:2px solid #2d8cf0;border-radius:8px;background:#fff;padding:4px;'/><br><span style='font-size:12px;color:#888;'>Mã: {t['uuid']}</span></td>"
+                        f"</tr>" for t in ticket_infos
+                    ])}
+                </tbody>
+            </table>
+            <div style='margin-top:24px;font-size:15px;color:#333;'>
+                <p><b>Hướng dẫn sử dụng vé:</b></p>
+                <ul style='margin:0 0 12px 18px;padding:0;'>
+                    <li>Xuất trình mã QR này tại cổng check-in sự kiện.</li>
+                    <li>Không chia sẻ mã QR cho người khác để tránh bị sử dụng mất quyền lợi.</li>
+                    <li>Nếu có thắc mắc, liên hệ <a href='mailto:support@eventhub.vn'>support@eventhub.vn</a>.</li>
+                </ul>
+                <p style='color:#888;font-size:13px;margin-top:18px;'>Email này được gửi tự động. Vui lòng không trả lời lại email này.</p>
+            </div>
+        </div>
+        """
+        try:
+            send_ticket_email(user.email, email_subject, html_body, tickets=ticket_infos)
+        except Exception as e:
+            print(f"[EMAIL ERROR] Không gửi được vé: {e}")
         # Cập nhật thông tin người dùng và sự kiện sau khi thanh toán
         update_user_and_event_after_payment(payment.user_id, event_id, payment.amount)
-        
         db.session.add(notif)
         db.session.flush()
         notif.send_to_user(payment.user)
