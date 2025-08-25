@@ -495,6 +495,6 @@ def vnpay_redirect():
 from datetime import datetime, timedelta
 
 @app.route('/tickets/cleanup', methods=['POST'])
-def cleanup_unpaid_tickets():
+def cleanup():
     cleanup_unpaid_tickets()
     return jsonify({'cleanup_unpaid_tickets called'})
