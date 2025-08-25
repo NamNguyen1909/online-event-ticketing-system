@@ -152,30 +152,9 @@
                     {% endif %}
                 </ul>
 
-                <!-- Thanh tìm kiếm sự kiện (desktop) -->
-                <form class="d-none d-lg-flex me-3" action="{{ url_for('events') }}" method="get" role="search">
-                    <div class="input-group">
-                        <input type="text" name="search" class="form-control" placeholder="Tìm kiếm sự kiện..." aria-label="Tìm kiếm sự kiện">
-                        <button class="btn btn-outline-light" type="submit">
-                            <i class="fas fa-search"></i>
-                        </button>
-                    </div>
-                </form>
-
                 <!-- User Actions -->
                 <ul class="navbar-nav">
-                    <!-- Cart/Tickets - Chỉ hiện cho customer -->
-                    {% if current_user and current_user.is_authenticated and current_user.role.value == 'customer' %}
-                    <li class="nav-item">
-                        <a class="nav-link position-relative" href="{{ url_for('my_tickets') }}">
-                            <i class="fas fa-shopping-cart"></i>
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="cart-badge">
-                                0
-                                <span class="visually-hidden">items in cart</span>
-                            </span>
-                        </a>
-                    </li>
-                    {% endif %}
+
 
                     <!-- Notifications - Hiện cho tất cả user đã đăng nhập -->
                     {% if current_user and current_user.is_authenticated %}
@@ -269,14 +248,7 @@
     <!-- Mobile Search Bar - Hiện dưới navbar cho mobile -->
     {% if not current_user or not current_user.is_authenticated or current_user.role.value == 'customer' %}
     <div class="container d-lg-none py-2">
-        <form action="{{ url_for('events') }}" method="get" role="search">
-            <div class="input-group">
-                <input class="form-control" type="search" name="search" placeholder="Tìm kiếm sự kiện..." aria-label="Search">
-                <button class="btn btn-outline-primary" type="submit">
-                    <i class="fas fa-search"></i>
-                </button>
-            </div>
-        </form>
+    <!-- Thanh tìm kiếm đã được chuyển xuống trang EventList -->
     </div>
     {% endif %}
 

@@ -1,9 +1,12 @@
 from eventapp import app, db, login_manager
-from eventapp.models import PaymentMethod
+from eventapp.models import PaymentMethod, Ticket,TicketType
 from eventapp import dao
 from flask import flash, jsonify, render_template, request, abort, session, redirect, url_for
 from flask_login import login_required, current_user
+from datetime import datetime, timedelta
 
+from flask import Blueprint, request, jsonify, redirect
+from eventapp.dao import create_payment_url_flask, vnpay_redirect_flask,cleanup_unpaid_tickets
 @app.route('/')
 def index():
     """Trang chủ"""
@@ -66,11 +69,49 @@ def events():
     search = request.args.get('search', '')
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
-    min_price = request.args.get('min_price', type=float)
-    max_price = request.args.get('max_price', type=float)
+    location = request.args.get('location', '')
+    price_min = request.args.get('price_min', type=float)
+    price_max = request.args.get('price_max', type=float)
+    quick_date = request.args.get('quick_date', '')
+    free = request.args.get('free', '')
 
-    events = dao.search_events(page, 12, category, search, start_date, end_date, min_price, max_price)
-    return render_template('customer/EventList.html', events=events)
+    # Xử lý quick_date (nếu muốn giữ các nút nhanh)
+    from datetime import datetime, timedelta
+    today = datetime.today()
+    if quick_date == 'today':
+        start_date = today.strftime('%Y-%m-%d')
+        end_date = today.strftime('%Y-%m-%d')
+    elif quick_date == 'tomorrow':
+        tomorrow = today + timedelta(days=1)
+        start_date = tomorrow.strftime('%Y-%m-%d')
+        end_date = tomorrow.strftime('%Y-%m-%d')
+    elif quick_date == 'weekend':
+        # Tìm ngày thứ 7 và CN gần nhất
+        saturday = today + timedelta((5 - today.weekday()) % 7)
+        sunday = saturday + timedelta(days=1)
+        start_date = saturday.strftime('%Y-%m-%d')
+        end_date = sunday.strftime('%Y-%m-%d')
+    elif quick_date == 'month':
+        start_date = today.replace(day=1).strftime('%Y-%m-%d')
+        # Tìm ngày cuối tháng
+        next_month = today.replace(day=28) + timedelta(days=4)
+        last_day = next_month - timedelta(days=next_month.day)
+        end_date = last_day.strftime('%Y-%m-%d')
+
+    # Xử lý miễn phí
+    if free:
+        price_max = 0
+
+    # Lấy danh sách thể loại cho dropdown
+    from eventapp.models import EventCategory
+    categories = list(EventCategory)
+
+    events = dao.search_events(page, 12, category, search, start_date, end_date, location, price_min, price_max)
+    category_title = None
+    if category:
+        from eventapp.dao import get_category_title
+        category_title = get_category_title(category)
+    return render_template('customer/EventList.html', events=events, categories=categories, category_title=category_title)
 
 @app.route('/trending')
 def trending():
@@ -86,13 +127,16 @@ def category(category):
     events = dao.get_events_by_category(category)
     if events is None:
         abort(404)
-    
+
     category_title = dao.get_category_title(category)
-    
+    from eventapp.models import EventCategory
+    categories = list(EventCategory)
+
     return render_template('customer/EventList.html', 
                   events=events, 
                   category=category,
-                  category_title=category_title)
+                  category_title=category_title,
+                  categories=categories)
 
 @app.route('/support')
 def support():
@@ -305,9 +349,13 @@ def book_ticket(event_id):
 @app.route('/booking/process', methods=['POST'])
 @login_required
 def process_booking():
-    """Xử lý thông tin đặt vé"""
+    """Xử lý đặt vé (AJAX)"""
+    cleanup_unpaid_tickets() #lazy cleanup ticket chưa thanh toán
+    
     try:
         data = request.get_json()
+        payment_method = data.get('payment_method')
+        tickets_data = data.get('tickets')
         
         # Log thông tin booking để kiểm tra
         print("=== BOOKING INFORMATION ===")
@@ -333,8 +381,53 @@ def process_booking():
         is_valid, error_message = dao.validate_ticket_availability(data.get('tickets'))
         if not is_valid:
             return jsonify({'success': False, 'message': error_message})
+
+
+
+        # Nếu chọn VNPay
+        if payment_method == 'vnpay':
+            # Tạo transaction_id duy nhất
+            import uuid
+            transaction_id = f"VNPAY_{uuid.uuid4().hex[:12]}"
+            # Tạo bản ghi Payment (status=False)
+            payment = dao.create_payment(
+                user_id=current_user.id,
+                amount=data['total_amount'],
+                payment_method=payment_method,
+                status=False,
+                transaction_id=transaction_id,
+                discount_code=data.get('discount_code')
+            )
+            db.session.commit()
+
+
+            # Tạo các vé với is_paid=False
+            for ticket_info in tickets_data:
+                ticket_type = TicketType.query.get(ticket_info['ticket_type_id'])
+                event_id = ticket_type.event_id if ticket_type else None
+                for _ in range(ticket_info['quantity']):
+                    ticket = Ticket(
+                        user_id=current_user.id,
+                        event_id=event_id,
+                        ticket_type_id=ticket_info['ticket_type_id'],
+                        is_paid=False,
+                        purchase_date=None,
+                        payment_id=payment.id
+                    )
+                    db.session.add(ticket)
+                    # Cập nhật sold_quantity tạm thời nếu muốn (hoặc chỉ tăng khi thanh toán thành công)
+            db.session.commit()
+
+
+
+            # Tạo URL thanh toán VNPay
+            payment_url = dao.create_payment_url_flask(data['total_amount'], txn_ref=transaction_id)
+            return jsonify({'success': True, 'payment_url': payment_url})
         
-        return jsonify({'success': True, 'message': 'Đặt vé thành công! (Demo mode)'})
+
+        # Nếu là phương thức khác (COD, chuyển khoản, ...)
+        # ...xử lý như cũ...
+        return jsonify({'success': True, 'message': 'Đặt vé thành công!'})
         
     except Exception as e:
         print(f"Error in process_booking: {str(e)}")
@@ -384,3 +477,24 @@ def test_auth():
         return f"<h2>Đã đăng nhập</h2><p>User: {current_user.username}</p><p>ID: {current_user.id}</p>"
     else:
         return f"<h2>Chưa đăng nhập</h2><p><a href='{url_for('auth.login')}'>Đăng nhập</a></p>"
+    
+
+@app.route('/vnpay/create_payment', methods=['POST'])
+def vnpay_create_payment():
+    data = request.get_json()
+    amount = data.get('amount')
+    txn_ref = data.get('txn_ref')
+    payment_url = create_payment_url_flask(amount, txn_ref)
+    return jsonify({'payment_url': payment_url})
+
+@app.route('/vnpay/redirect')
+def vnpay_redirect():
+    return vnpay_redirect_flask()
+
+# API/job xóa vé chưa thanh toán
+from datetime import datetime, timedelta
+
+@app.route('/tickets/cleanup', methods=['POST'])
+def cleanup_unpaid_tickets():
+    cleanup_unpaid_tickets()
+    return jsonify({'cleanup_unpaid_tickets called'})
