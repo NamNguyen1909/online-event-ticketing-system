@@ -10,9 +10,10 @@ services:
     runtime: python
     workDir: .
     buildCommand: |
+      cd eventapp
       pip install -r requirements.txt
       ls -l eventapp/migrations
-      cd eventapp
+      
       ls -l migrations
       flask db upgrade || { echo "[ERROR] DB upgrade failed"; exit 1; }
       cd ..
