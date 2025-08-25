@@ -10,8 +10,8 @@ services:
     runtime: python
     workDir: .
     buildCommand: |
+      echo "===> Bắt đầu build stage"
       pip install -r requirements.txt
-    releaseCommand: |
       echo "===> Bắt đầu release stage"
       # cd eventapp
       echo "===> Init migrations nếu chưa có"
