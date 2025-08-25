@@ -14,6 +14,17 @@
 <div class="container mx-auto p-4">
   <h1 class="text-2xl font-bold mb-4">Sự Kiện Của Tôi</h1>
 
+  <!-- Hiển thị thông báo flash -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-4">
+        {% for category, message in messages %}
+          <div class="bg-{{ 'green' if category == 'success' else 'red' }}-100 text-{{ 'green' if category == 'success' else 'red' }}-800 p-2 rounded">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
   <!-- Thanh thao tác -->
   <div class="mb-4 flex justify-between">
     <div id="action-buttons">
@@ -212,31 +223,36 @@
 
   async function openEditModal(eventId) {
     currentEventId = eventId || selectedEventIds[0];
-    const response = await fetch(`/organizer/event/${currentEventId}`);
-    const event = await response.json();
-    document.getElementById('edit-event-name').value = event.title;
-    document.getElementById('edit-category').value = event.category;
-    document.getElementById('edit-description').value = event.description;
-    document.getElementById('edit-location').value = event.location;
-    document.getElementById('edit-start-time').value = event.start_time;
-    document.getElementById('edit-end-time').value = event.end_time;
+    try {
+      const response = await fetch(`/organizer/event/${currentEventId}`);
+      if (!response.ok) throw new Error('Không thể lấy dữ liệu sự kiện');
+      const event = await response.json();
+      document.getElementById('edit-event-name').value = event.title;
+      document.getElementById('edit-category').value = event.category;
+      document.getElementById('edit-description').value = event.description;
+      document.getElementById('edit-location').value = event.location;
+      document.getElementById('edit-start-time').value = event.start_time;
+      document.getElementById('edit-end-time').value = event.end_time;
 
-    // Điền danh sách loại vé
-    const ticketContainer = document.getElementById('ticket-types-container');
-    ticketContainer.innerHTML = '';
-    event.ticket_types.forEach(tt => addTicketType(tt.id, tt.name, tt.price, tt.total_quantity));
+      // Điền danh sách loại vé
+      const ticketContainer = document.getElementById('ticket-types-container');
+      ticketContainer.innerHTML = '';
+      event.ticket_types.forEach(tt => addTicketType(tt.id, tt.name, tt.price, tt.total_quantity));
 
-    // Xem trước poster
-    const preview = document.getElementById('poster-preview');
-    if (event.poster_url) {
-      preview.src = event.poster_url;
-      preview.classList.remove('hidden');
-    } else {
-      preview.classList.add('hidden');
+      // Xem trước poster
+      const preview = document.getElementById('poster-preview');
+      if (event.poster_url) {
+        preview.src = event.poster_url;
+        preview.classList.remove('hidden');
+      } else {
+        preview.classList.add('hidden');
+      }
+
+      document.getElementById('edit-event-form').action = `/organizer/update-event/${currentEventId}`;
+      document.getElementById('edit-modal').classList.add('show');
+    } catch (error) {
+      alert('Lỗi khi tải dữ liệu sự kiện: ' + error.message);
     }
-
-    document.getElementById('edit-event-form').action = `/organizer/update-event/${currentEventId}`;
-    document.getElementById('edit-modal').classList.add('show');
   }
 
   function addTicketType(id = '', name = '', price = '', quantity = '') {
@@ -246,7 +262,7 @@
     div.innerHTML = `
       <input type="hidden" name="ticket_type_ids[]" value="${id}">
       <input type="text" name="ticket_names[]" placeholder="Tên vé" value="${name}" class="form-control" required>
-      <input type="number" name="ticket_prices[]" placeholder="Giá" value="${price}" class="form-control" required min="0">
+      <input type="number" name="ticket_prices[]" placeholder="Giá" value="${price}" class="form-control" required min="0" step="0.01">
       <input type="number" name="ticket_quantities[]" placeholder="Số lượng" value="${quantity}" class="form-control" required min="1">
       <button type="button" onclick="removeTicketType(this)" class="bg-red-500 text-white px-2 py-1 rounded">Xóa</button>
     `;
@@ -254,7 +270,11 @@
   }
 
   function removeTicketType(btn) {
-    btn.parentElement.remove();
+    if (document.querySelectorAll('.ticket-type').length > 1) {
+      btn.parentElement.remove();
+    } else {
+      alert('Phải có ít nhất một loại vé.');
+    }
   }
 
   function closeEditModal() {
@@ -271,17 +291,27 @@
   }
 
   async function deleteEvent() {
-    await fetch(`/organizer/delete-event/${currentEventId}`, { method: 'POST' });
-    window.location.reload();
+    try {
+      const response = await fetch(`/organizer/delete-event/${currentEventId}`, { method: 'POST' });
+      if (!response.ok) throw new Error('Không thể xóa sự kiện');
+      window.location.reload();
+    } catch (error) {
+      alert('Lỗi khi xóa sự kiện: ' + error.message);
+    }
   }
 
   async function deactivateEvents() {
-    await fetch('/organizer/bulk-delete-events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event_ids: selectedEventIds })
-    });
-    window.location.reload();
+    try {
+      const response = await fetch('/organizer/bulk-delete-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: selectedEventIds })
+      });
+      if (!response.ok) throw new Error('Không thể ngưng hoạt động sự kiện');
+      window.location.reload();
+    } catch (error) {
+      alert('Lỗi khi ngưng hoạt động sự kiện: ' + error.message);
+    }
   }
 
   document.getElementById('edit-poster').addEventListener('change', function(e) {

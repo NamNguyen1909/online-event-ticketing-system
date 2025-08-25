@@ -62,7 +62,7 @@ class CreateEventForm(FlaskForm):
             raise ValidationError('Thời gian kết thúc phải sau thời gian bắt đầu.')
 
 # Form for update event (similar, but optional for some)
-class UpdateEventForm(CreateEventForm):
+class UpdateEventForm(FlaskForm):
     title = StringField('Tiêu Đề', validators=[Optional(), Length(min=3, max=255)])
     description = TextAreaField('Mô Tả', validators=[Optional(), Length(max=5000)])
     category = SelectField('Danh Mục', validators=[Optional()], choices=[(cat.value, cat.name.title()) for cat in EventCategory])
@@ -70,6 +70,10 @@ class UpdateEventForm(CreateEventForm):
     end_time = DateTimeLocalField('Thời Gian Kết Thúc', validators=[Optional()], format='%Y-%m-%dT%H:%M')
     location = StringField('Địa Điểm', validators=[Optional(), Length(max=500)])
     poster = FileField('Poster', validators=[Optional(), FileAllowed(['jpg', 'png'], 'Chỉ cho phép ảnh!')])
+
+    def validate_end_time(self, field):
+        if self.start_time.data and field.data and self.start_time.data >= field.data:
+            raise ValidationError('Thời gian kết thúc phải sau thời gian bắt đầu.')
 
 @app.route('/')
 def index():
@@ -317,21 +321,37 @@ def update_event_route(event_id):
             ticket_names = request.form.getlist('ticket_names[]')
             ticket_prices = request.form.getlist('ticket_prices[]')
             ticket_quantities = request.form.getlist('ticket_quantities[]')
+            
             for i in range(len(ticket_names)):
+                if not ticket_names[i]:
+                    flash('Tên vé không được để trống.', 'danger')
+                    return render_template('organizer/MyEvents.html', form=form, events=dao.get_user_events(current_user.id))
+                try:
+                    price = float(ticket_prices[i])
+                    quantity = int(ticket_quantities[i])
+                except ValueError:
+                    flash('Giá vé hoặc số lượng không hợp lệ.', 'danger')
+                    return render_template('organizer/MyEvents.html', form=form, events=dao.get_user_events(current_user.id))
+                    
                 data['ticket_types'].append({
                     'id': ticket_ids[i] if ticket_ids[i] else None,
                     'name': ticket_names[i],
-                    'price': float(ticket_prices[i]),
-                    'total_quantity': int(ticket_quantities[i])
+                    'price': price,
+                    'total_quantity': quantity
                 })
+                
             dao.update_event_with_tickets(event_id, data, current_user.id)
             flash('Cập nhật sự kiện thành công!', 'success')
             return redirect(url_for('organizer_my_events'))
-        return render_template('organizer/MyEvents.html', form=form, events=dao.get_user_events(current_user.id))
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    flash(f'Lỗi ở trường {field}: {error}', 'danger')
+            return render_template('organizer/MyEvents.html', form=form, events=dao.get_user_events(current_user.id))
     except Exception as e:
         db.session.rollback()
         flash(f'Lỗi: {str(e)}', 'danger')
-        return redirect(url_for('organizer_my_events'))
+        return render_template('organizer/MyEvents.html', form=form, events=dao.get_user_events(current_user.id))
 
 @app.route('/organizer/delete-event/<int:event_id>', methods=['POST'])
 @login_required
