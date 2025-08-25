@@ -9,8 +9,8 @@ services:
     name: eventhub
     runtime: python
     buildCommand: |
-      cd eventapp
       pip install -r requirements.txt
+      cd eventapp
       ls -l migrations
       flask db upgrade || { echo "[ERROR] DB upgrade failed"; exit 1; }
       cd ..
