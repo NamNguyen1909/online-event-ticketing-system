@@ -377,25 +377,25 @@ def seed_database():
     try:
         print("🌱 Bắt đầu seed database...")
         
-        # # Kiểm tra xem đã có dữ liệu chưa
-        # existing_users = User.query.first()
-        # if existing_users:
-        #     print("📊 Database đã có dữ liệu, bỏ qua seed")
-        #     return
+        # Kiểm tra xem đã có dữ liệu chưa
+        existing_users = User.query.first()
+        if existing_users:
+            print("📊 Database đã có dữ liệu, bỏ qua seed")
+            return
         
-        # print("🧹 Xóa dữ liệu cũ...")
-        # # Xóa từng bảng một cách an toàn
-        # UserNotification.query.delete()
-        # Notification.query.delete()
-        # Review.query.delete()
-        # EventTrendingLog.query.delete()
-        # Ticket.query.delete()
-        # Payment.query.delete()
-        # TicketType.query.delete()
-        # DiscountCode.query.delete()
-        # Event.query.delete()
-        # User.query.delete()
-        # db.session.commit()
+        print("🧹 Xóa dữ liệu cũ...")
+        # Xóa từng bảng một cách an toàn
+        UserNotification.query.delete()
+        Notification.query.delete()
+        Review.query.delete()
+        EventTrendingLog.query.delete()
+        Ticket.query.delete()
+        Payment.query.delete()
+        TicketType.query.delete()
+        DiscountCode.query.delete()
+        Event.query.delete()
+        User.query.delete()
+        db.session.commit()
         
         # Tạo dữ liệu mới
         print("👥 Tạo users...")
