@@ -730,8 +730,6 @@ def create_or_update_review(event_id, user_id, content, rating):
     return review
 
 def create_review_reply(parent_review_id, user_id, content):
-    from datetime import datetime
-    from eventapp.models import Notification, UserNotification
     parent = Review.query.get(parent_review_id)
     if not parent:
         return None
@@ -739,7 +737,6 @@ def create_review_reply(parent_review_id, user_id, content):
     db.session.add(reply)
     db.session.commit()
     # Tạo notification cho customer đã review
-    from eventapp.models import User
     customer = User.query.get(parent.user_id)
     if customer:
         notif = Notification(
@@ -749,9 +746,8 @@ def create_review_reply(parent_review_id, user_id, content):
             notification_type="review_reply"
         )
         db.session.add(notif)
-        db.session.commit()
-        user_notif = UserNotification(user_id=customer.id, notification_id=notif.id)
-        db.session.add(user_notif)
+        db.session.flush()
+        notif.send_to_user(customer)
         db.session.commit()
     return reply
 

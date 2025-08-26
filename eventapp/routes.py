@@ -409,13 +409,6 @@ def debug_events():
     events = dao.get_all_events()
     return f"Có {len(events)} events trong database: {[e.id for e in events]}"
 
-@app.route('/staff/scan')
-@login_required
-def staff_scan():
-    if current_user.role.value != 'staff':
-        abort(403)
-    return render_template('staff/scan.html')
-
 
 @app.route('/organizer/dashboard')
 @login_required
@@ -1072,3 +1065,53 @@ def get_event_data_full(event_id):
 def page_not_found(e):
     logging.error(f"Trang không tìm thấy: {request.url}")
     return render_template('404.html'), 404
+
+@app.route('/staff/scan-ticket', methods=['GET', 'POST'])
+@login_required
+def staff_scan_ticket():
+    if current_user.role.value != 'staff':
+        abort(403)
+    from eventapp.models import Ticket, UserNotification
+    from eventapp import db
+    from datetime import datetime
+    from flask import jsonify, request, render_template
+    import sys
+    if request.method == 'GET':
+        return render_template('staff/scan_ticket.html')
+    # POST: xử lý quét QR
+    data = request.get_json()
+    qr_data = data.get('qr_data') if data else None
+    if not qr_data:
+        print('No qr_data received', file=sys.stderr)
+        return jsonify({'success': False, 'message': 'Không nhận được dữ liệu QR.'}), 400
+    ticket = Ticket.query.filter_by(uuid=qr_data).first()
+    if not ticket:
+        print('Ticket not found', file=sys.stderr)
+        return jsonify({'success': False, 'message': 'Vé không hợp lệ hoặc không tồn tại.'}), 404
+    if not ticket.is_paid:
+        print('Ticket not paid', file=sys.stderr)
+        return jsonify({'success': False, 'message': 'Vé chưa được thanh toán.'}), 400
+    if ticket.is_checked_in:
+        print('Ticket already checked in', file=sys.stderr)
+        return jsonify({'success': False, 'message': 'Vé đã được check-in trước đó.'}), 400
+    # Cập nhật trạng thái check-in
+    ticket.check_in()
+    db.session.commit()
+    # Tạo Notification và gửi cho user
+    from eventapp.models import Notification
+    notif_title = f'Check-in thành công'
+    notif_msg = f'Vé cho sự kiện "{ticket.event.title}" đã được check-in thành công lúc {ticket.check_in_date.strftime("%H:%M %d/%m/%Y")}. '
+    notification = Notification(
+        event_id=ticket.event_id,
+        title=notif_title,
+        message=notif_msg,
+        notification_type='checkin'
+    )
+    db.session.add(notification)
+    db.session.flush()  # Đảm bảo notification.id có giá trị
+    print(f'[DEBUG] Đã tạo Notification id={notification.id} cho user_id={ticket.user_id}', file=sys.stderr)
+    notification.send_to_user(ticket.user)
+    db.session.commit()
+    print(f'[DEBUG] Đã gửi notification cho user_id={ticket.user_id}', file=sys.stderr)
+    print(f'Check-in thành công cho vé của {ticket.user.username}', file=sys.stderr)
+    return jsonify({'success': True, 'message': f'Check-in thành công cho vé của {ticket.user.username}.'})
