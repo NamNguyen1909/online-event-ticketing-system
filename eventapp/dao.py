@@ -48,7 +48,7 @@ def get_user_notifications(user_id):
     """Lấy toàn bộ thông báo của người dùng (không phân trang, dùng cho trang profile hoặc debug)"""
     return UserNotification.query.filter_by(user_id=user_id).order_by(UserNotification.created_at.desc()).all()
 
-def get_user_notifications_paginated(user_id, offset=0, limit=10):
+def get_user_notifications_paginated(user_id, offset=0, limit=5):
     """Lấy thông báo của người dùng, phân trang (dùng cho dropdown/infinite scroll)"""
     return UserNotification.query.filter_by(user_id=user_id).order_by(UserNotification.created_at.desc()).offset(offset).limit(limit).all()
 

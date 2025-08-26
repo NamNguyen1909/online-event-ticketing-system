@@ -252,26 +252,34 @@
                     function loadNotifications(reset=false) {
                         if (loadingNoti || allLoaded) return;
                         loadingNoti = true;
+                        const notiList = document.getElementById('notification-list');
                         if (reset) {
                             notiOffset = 0;
                             allLoaded = false;
+                            notiList.innerHTML = '';
                         }
                         fetch(`/notifications/load-more?offset=${notiOffset}&limit=${notiLimit}`)
                             .then(r=>r.text())
                             .then(html=>{
-                                const notiList = document.getElementById('notification-list');
-                                if (reset) notiList.innerHTML = '';
-                                // Parse HTML and append before divider
                                 let temp = document.createElement('div');
                                 temp.innerHTML = html;
                                 let items = temp.querySelectorAll('.notification-item');
                                 let divider = temp.querySelector('.dropdown-divider');
                                 let markAllBtn = temp.querySelector('#mark-all-read-btn');
-                                // Remove old divider/btn
-                                notiList.innerHTML = '';
-                                items.forEach(i=>notiList.appendChild(i));
-                                if (divider) notiList.appendChild(divider);
-                                if (markAllBtn) notiList.appendChild(markAllBtn.parentElement);
+                                // Nếu reset thì clear, nếu không thì chỉ append thêm items trước divider
+                                if (reset) {
+                                    notiList.innerHTML = '';
+                                    items.forEach(i=>notiList.appendChild(i));
+                                    if (divider) notiList.appendChild(divider);
+                                    if (markAllBtn) notiList.appendChild(markAllBtn.parentElement);
+                                } else {
+                                    // Chèn trước divider (nếu có), nếu không thì append cuối
+                                    let dividerNode = notiList.querySelector('.dropdown-divider');
+                                    items.forEach(i=>{
+                                        if (dividerNode) notiList.insertBefore(i, dividerNode);
+                                        else notiList.appendChild(i);
+                                    });
+                                }
                                 if (items.length < notiLimit) allLoaded = true;
                                 notiOffset += items.length;
                             })
