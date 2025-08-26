@@ -1,0 +1,23 @@
+{% extends 'layout/base.html' %}
+{% block title %}Sửa Người Dùng{% endblock %}
+{% block content %}
+<div class="container">
+    <h1>Sửa Thông Tin Người Dùng</h1>
+    <form method="post">
+        <div class="mb-3">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="role" class="form-label">Vai trò</label>
+            <select class="form-select" id="role" name="role">
+                <option value="admin" {% if user.role.value == 'admin' %}selected{% endif %}>Admin</option>
+                <option value="staff" {% if user.role.value == 'staff' %}selected{% endif %}>Staff</option>
+                <option value="customer" {% if user.role.value == 'customer' %}selected{% endif %}>Customer</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Lưu</button>
+        <a href="{{ url_for('admin_user_management') }}" class="btn btn-secondary">Quay lại</a>
+    </form>
+</div>
+{% endblock %}

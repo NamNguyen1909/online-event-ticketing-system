@@ -1,0 +1,77 @@
+{% extends 'layout/base.html' %}
+{% block title %}Kiểm Duyệt Sự Kiện{% endblock %}
+{% block content %}
+<div class="container py-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'warning' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    <h1 class="mb-4 text-center text-warning fw-bold">Kiểm Duyệt Sự Kiện</h1>
+    <div class="card shadow border-0 mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">Danh Sách Sự Kiện</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+            <table class="table table-hover table-bordered align-middle">
+                <thead class="table-light text-center">
+                    <tr>
+                        <th>ID</th>
+                        <th>Tên sự kiện</th>
+                        <th>Trạng thái</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in events %}
+                    <tr>
+                        <td class="text-center">{{ event.id }}</td>
+                        <td>{{ event.title }}</td>
+                        <td class="text-center">
+                          {% if not event.is_active %}
+                            <span class="badge bg-danger">Bị từ chối</span>
+                          {% elif event.is_ongoing %}
+                            <span class="badge bg-success">Đang diễn ra</span>
+                          {% elif event.is_upcoming %}
+                            <span class="badge bg-info text-dark">Sắp diễn ra</span>
+                          {% else %}
+                            <span class="badge bg-secondary">Đã kết thúc</span>
+                          {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <form action="{{ url_for('approve_event', event_id=event.id) }}" method="post" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-success" {% if event.is_active %}disabled{% endif %}>Duyệt</button>
+                            </form>
+                            <form action="{{ url_for('reject_event', event_id=event.id) }}" method="post" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-danger" {% if not event.is_active %}disabled{% endif %}>Từ chối</button>
+                            </form>
+                            <a href="{{ url_for('event_detail_admin', event_id=event.id) }}" class="btn btn-sm btn-info">Chi tiết</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </div>
+    </div>
+    <div class="d-flex gap-2 justify-content-center mb-4">
+        <a href="{{ url_for('admin_user_management') }}" class="btn btn-outline-primary">Quản Lý Người Dùng</a>
+        <a href="{{ url_for('admin_event_moderation') }}" class="btn btn-outline-warning">Kiểm Duyệt Sự Kiện</a>
+        <a href="/admin" class="btn btn-outline-info">Cài Đặt Hệ Thống</a>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">Quay Lại</a>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+    setTimeout(function() {
+        $('.alert').alert('close');
+    }, 3000);
+</script>
+{% endblock %}
