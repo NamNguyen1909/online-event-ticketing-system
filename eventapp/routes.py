@@ -1,6 +1,6 @@
 from eventapp import app, db, login_manager
 
-from eventapp.models import PaymentMethod, EventCategory, UserRole, User, Event, Ticket, TicketType
+from eventapp.models import PaymentMethod, EventCategory, Review, UserRole, User, Event, Ticket, TicketType
 
 from eventapp import dao
 from flask import flash, jsonify, render_template, request, abort, session, redirect, url_for
@@ -151,18 +151,21 @@ def event_detail(event_id):
             main_reviews = dao.get_event_reviews(event.id, limit=5)
         stats = dao.calculate_event_stats(active_ticket_types, all_reviews)
         can_reply = False
+        can_review = False
         my_review = None
         if current_user.is_authenticated:
             if current_user.role.value in ['organizer', 'staff']:
                 can_reply = True
             if current_user.role.value == 'customer':
                 my_review = dao.get_user_review(event.id, current_user.id)
+                can_review = dao.user_can_review(event.id, current_user.id)
         return render_template('customer/EventDetail.html', 
                              event=event, 
                              ticket_types=active_ticket_types,
                              reviews=main_reviews,
                              stats=stats,
                              can_reply=can_reply,
+                             can_review=can_review,
                              my_review=my_review)
     except Exception as e:
         print(f"Error in event_detail: {str(e)}")

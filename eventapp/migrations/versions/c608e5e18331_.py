@@ -1,8 +1,8 @@
-"""initial
+"""empty message
 
-Revision ID: e4acc34ae453
+Revision ID: c608e5e18331
 Revises: 
-Create Date: 2025-08-25 23:09:47.964030
+Create Date: 2025-08-26 15:48:22.093136
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'e4acc34ae453'
+revision = 'c608e5e18331'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -63,6 +63,8 @@ def upgrade():
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('creator_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['creator_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('users', schema=None) as batch_op:
@@ -109,6 +111,13 @@ def upgrade():
         batch_op.create_index('ix_payment_transaction_id', ['transaction_id'], unique=False)
         batch_op.create_index('ix_payment_user_status', ['user_id', 'status'], unique=False)
 
+    op.create_table('event_staff',
+    sa.Column('event_id', sa.Integer(), nullable=False),
+    sa.Column('staff_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['event_id'], ['events.id'], ),
+    sa.ForeignKeyConstraint(['staff_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('event_id', 'staff_id')
+    )
     op.create_table('event_trending_logs',
     sa.Column('event_id', sa.Integer(), nullable=False),
     sa.Column('view_count', sa.Integer(), nullable=False),
@@ -140,7 +149,7 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('event_id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
-    sa.Column('rating', sa.Integer(), nullable=False),
+    sa.Column('rating', sa.Integer(), nullable=True),
     sa.Column('comment', sa.Text(), nullable=True),
     sa.Column('parent_review_id', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
@@ -160,7 +169,7 @@ def upgrade():
     sa.Column('event_id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
-    sa.Column('price', sa.Numeric(precision=9, scale=2), nullable=False),
+    sa.Column('price', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('total_quantity', sa.Integer(), nullable=False),
     sa.Column('sold_quantity', sa.Integer(), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
@@ -204,7 +213,6 @@ def upgrade():
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('notification_id', sa.Integer(), nullable=False),
     sa.Column('is_read', sa.Boolean(), nullable=False),
-    sa.Column('is_email_sent', sa.Boolean(), nullable=False),
     sa.Column('read_at', sa.DateTime(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['notification_id'], ['notifications.id'], ),
@@ -250,6 +258,7 @@ def downgrade():
         batch_op.drop_index('ix_trending_event_last_updated')
 
     op.drop_table('event_trending_logs')
+    op.drop_table('event_staff')
     with op.batch_alter_table('payments', schema=None) as batch_op:
         batch_op.drop_index('ix_payment_user_status')
         batch_op.drop_index('ix_payment_transaction_id')
