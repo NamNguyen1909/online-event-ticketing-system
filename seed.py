@@ -378,16 +378,20 @@ def seed_database():
         print("🌱 Bắt đầu seed database...")
         
         # Kiểm tra xem đã có dữ liệu chưa
-        existing_users = User.query.first()
-        if existing_users:
-            print("📊 Database đã có dữ liệu, bỏ qua seed")
-            return
+        # existing_users = User.query.first()
+        # if existing_users:
+        #     print("📊 Database đã có dữ liệu, bỏ qua seed")
+        #     return
         
         print("🧹 Xóa dữ liệu cũ...")
         # Xóa từng bảng một cách an toàn
         UserNotification.query.delete()
         Notification.query.delete()
+        from sqlalchemy import text
+        db.session.execute(text('SET FOREIGN_KEY_CHECKS=0;'))
         Review.query.delete()
+        db.session.commit()
+        db.session.execute(text('SET FOREIGN_KEY_CHECKS=1;'))
         EventTrendingLog.query.delete()
         Ticket.query.delete()
         Payment.query.delete()

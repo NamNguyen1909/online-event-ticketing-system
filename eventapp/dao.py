@@ -655,7 +655,103 @@ def vnpay_redirect_flask():
         </html>
     """)
 
-# Debug function
-def get_all_events():
-    """Lấy tất cả sự kiện (debug)"""
-    return Event.query.all()
+
+def create_payment(user_id, amount, payment_method, status, transaction_id, discount_code=None):
+    """
+    Tạo một đối tượng Payment mới.
+    """
+    payment = Payment(
+        user_id=user_id,
+        amount=amount,
+        payment_method=PaymentMethod(payment_method),
+        status=status,
+        transaction_id=transaction_id
+    )
+    if discount_code:
+        dc = DiscountCode.query.filter_by(code=discount_code).first()
+        if dc:
+            payment.discount_code = dc
+    db.session.add(payment)
+    return payment
+
+def update_user_and_event_after_payment(user_id, event_id, amount):
+    """
+    Cập nhật tổng chi tiêu của user và tính lại điểm trending cho event sau khi thanh toán thành công.
+    """
+    user = User.query.get(user_id)
+    event = Event.query.get(event_id)
+    if user and amount:
+        user.total_spent = (user.total_spent or 0) + amount
+    if event and event.trending_log:
+        event.trending_log.calculate_score()
+    db.session.commit()
+
+def cleanup_unpaid_tickets(timeout_minutes=1):
+    expire_time = datetime.utcnow() - timedelta(minutes=timeout_minutes)
+    tickets = Ticket.query.filter(
+        Ticket.is_paid == False,
+        Ticket.purchase_date == None,
+        Ticket.created_at < expire_time
+    ).all()
+    for ticket in tickets:
+        db.session.delete(ticket)
+    db.session.commit()
+
+# ========== Review DAO ========== #
+def get_user_review(event_id, user_id):
+    """Lấy review của user cho sự kiện (nếu có)"""
+    return Review.query.filter_by(event_id=event_id, user_id=user_id, parent_review_id=None).first()
+
+def user_can_review(event_id, user_id):
+    """Chỉ customer đã mua vé, chưa review mới được review"""
+    from eventapp.models import Ticket, User
+    user = User.query.get(user_id)
+    if not user or user.role.value != 'customer':
+        return False
+    has_ticket = Ticket.query.filter_by(user_id=user_id, event_id=event_id, is_paid=True).first()
+    review = get_user_review(event_id, user_id)
+    return bool(has_ticket) and (review is None)
+
+def get_review_replies(review_id):
+    """Lấy replies cho 1 review"""
+    return Review.query.filter_by(parent_review_id=review_id).order_by(Review.created_at.asc()).all()
+
+def create_or_update_review(event_id, user_id, content, rating):
+    from datetime import datetime
+    review = get_user_review(event_id, user_id)
+    if review:
+        review.content = content
+        review.rating = rating
+        review.updated_at = datetime.utcnow()
+    else:
+        review = Review(event_id=event_id, user_id=user_id, rating=rating, comment=content, created_at=datetime.utcnow())
+        db.session.add(review)
+    db.session.commit()
+    return review
+
+def create_review_reply(parent_review_id, user_id, content):
+    from datetime import datetime
+    from eventapp.models import Notification, UserNotification
+    parent = Review.query.get(parent_review_id)
+    if not parent:
+        return None
+    reply = Review(event_id=parent.event_id, user_id=user_id, rating=None, comment=content, parent_review_id=parent_review_id, created_at=datetime.utcnow())
+    db.session.add(reply)
+    db.session.commit()
+    # Tạo notification cho customer đã review
+    from eventapp.models import User
+    customer = User.query.get(parent.user_id)
+    if customer:
+        notif = Notification(
+            event_id=parent.event_id,
+            title="Phản hồi đánh giá của bạn",
+            message=f"Đánh giá của bạn đã được phản hồi: {content}",
+            notification_type="review_reply"
+        )
+        db.session.add(notif)
+        db.session.commit()
+        user_notif = UserNotification(user_id=customer.id, notification_id=notif.id)
+        db.session.add(user_notif)
+        db.session.commit()
+    return reply
+
