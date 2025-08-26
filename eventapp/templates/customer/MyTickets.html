@@ -26,7 +26,17 @@
                 <td>{{ ticket.event.title if ticket.event else 'N/A' }}</td>
                 <td>{{ ticket.ticket_type.name if ticket.ticket_type else 'N/A' }}</td>
                 <td>{{ ticket.purchase_date.strftime('%d/%m/%Y %H:%M') if ticket.purchase_date else 'N/A' }}</td>
-                <td><span class="badge bg-success">Đã thanh toán</span></td>
+                <td>
+                    <span class="badge bg-success">Đã thanh toán</span>
+                    <br>
+                    {% if ticket.is_checked_in %}
+                        <span class="badge bg-info mt-1">Đã check-in</span>
+                        <br>
+                        <small class="text-muted">Lúc: {{ ticket.check_in_date.strftime('%d/%m/%Y %H:%M') if ticket.check_in_date else '' }}</small>
+                    {% else %}
+                        <span class="badge bg-warning text-dark mt-1">Chưa check-in</span>
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>
