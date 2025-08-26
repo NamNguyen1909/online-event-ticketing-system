@@ -35,7 +35,6 @@
                     {% elif current_user.role.value == 'organizer' %}
                         <!-- Organizer menu -->
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('events') }}"><i class="fas fa-calendar-alt me-1"></i>Sự Kiện</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('organizer_dashboard') }}"><i class="fas fa-chart-bar me-1"></i>Thống Kê</a></li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="eventManagementDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="fas fa-calendar-plus me-1"></i>Quản Lý Sự Kiện
@@ -47,7 +46,6 @@
                             </ul>
                         </li>
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('organizer_manage_staff') }}"><i class="fas fa-users-cog me-1"></i>Quản Lý Nhân Viên</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('organizer_revenue_reports') }}"><i class="fas fa-money-bill-wave me-1"></i>Báo Cáo Doanh Thu</a></li>
                     {% elif current_user.role.value == 'admin' %}
                         <!-- Admin menu -->
                         <li class="nav-item dropdown">
