@@ -10,6 +10,7 @@ colorama==0.4.6
 cryptography==45.0.5
 Faker==37.4.2
 Flask==3.1.1
+Flask-Admin==1.6.1
 Flask-Login==0.6.3
 Flask-Mail==0.10.0
 Flask-Migrate==4.0.7
