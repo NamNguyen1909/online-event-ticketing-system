@@ -5,13 +5,15 @@ from flask import flash, jsonify, render_template, request, abort, session, redi
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Blueprint, request, jsonify, redirect
 from eventapp.dao import create_payment_url_flask, vnpay_redirect_flask,cleanup_unpaid_tickets
+
 @app.route('/')
 def index():
     """Trang chủ"""
-    featured_events = dao.get_featured_events()
-    return render_template('index.html', events=featured_events)
+    trending_events = dao.get_trending_events(limit=6)
+    return render_template('index.html', events=trending_events)
 
 @app.route('/event/<int:event_id>')
 def event_detail(event_id):
@@ -169,7 +171,97 @@ def faq():
 @app.route('/profile')
 @login_required
 def profile():
-    return render_template('profile.html', user=current_user)
+    from eventapp.models import Ticket
+    recent_tickets = Ticket.query.filter_by(user_id=current_user.id, is_paid=True).order_by(Ticket.purchase_date.desc()).limit(5).all()
+    return render_template('customer/Profile.html', user=current_user, recent_tickets=recent_tickets)
+
+# Route chỉnh sửa thông tin hồ sơ
+from flask import request, redirect, flash, url_for
+
+@app.route('/profile/edit', methods=['GET', 'POST'])
+@login_required
+def edit_profile():
+    user = current_user
+    message = None
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        phone = request.form.get('phone')
+        avatar_file = request.files.get('avatar')
+
+        from eventapp.models import User
+        # Kiểm tra trùng username
+        if username and username != user.username:
+            if User.query.filter(User.username==username, User.id!=user.id).first():
+                message = 'Tên đăng nhập đã tồn tại!'
+            else:
+                user.username = username
+        # Kiểm tra trùng email
+        if email and email != user.email:
+            if User.query.filter(User.email==email, User.id!=user.id).first():
+                message = 'Email đã tồn tại!'
+            else:
+                user.email = email
+        if phone:
+            user.phone = phone
+        if avatar_file and avatar_file.filename:
+            try:
+                user.upload_avatar(avatar_file)
+            except Exception as e:
+                message = f'Lỗi cập nhật ảnh đại diện: {str(e)}'
+
+        # Đổi mật khẩu nếu có nhập
+        old_password = request.form.get('old_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        if old_password or new_password or confirm_password:
+            if not old_password or not new_password or not confirm_password:
+                message = 'Vui lòng nhập đầy đủ thông tin đổi mật khẩu!'
+            elif not check_password_hash(user.password_hash, old_password):
+                message = 'Mật khẩu hiện tại không đúng!'
+            elif new_password != confirm_password:
+                message = 'Mật khẩu mới không khớp!'
+            elif len(new_password) < 6:
+                message = 'Mật khẩu mới phải từ 6 ký tự trở lên!'
+            else:
+                user.password_hash = generate_password_hash(new_password)
+
+        from eventapp import db
+        try:
+            db.session.commit()
+            if not message:
+                message = 'Cập nhật hồ sơ thành công!'
+        except Exception as e:
+            db.session.rollback()
+            message = f'Lỗi cập nhật hồ sơ: {str(e)}'
+        return render_template('customer/EditProfile.html', user=user, message=message)
+    # GET: render form chỉnh sửa riêng
+    return render_template('customer/EditProfile.html', user=user, message=message)
+
+# Route đổi mật khẩu
+@app.route('/profile/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    message = None
+    if request.method == 'POST':
+        old_password = request.form.get('old_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        if not check_password_hash(current_user.password_hash, old_password):
+            message = 'Mật khẩu cũ không đúng!'
+        elif new_password != confirm_password:
+            message = 'Mật khẩu mới không khớp!'
+        elif len(new_password) < 6:
+            message = 'Mật khẩu mới phải từ 6 ký tự trở lên!'
+        else:
+            current_user.password_hash = generate_password_hash(new_password)
+            try:
+                db.session.commit()
+                message = 'Đổi mật khẩu thành công!'
+            except Exception as e:
+                db.session.rollback()
+                message = f'Lỗi đổi mật khẩu: {str(e)}'
+    return render_template('customer/ChangePassword.html', user=current_user, message=message)
 
 @app.route('/my-tickets')
 @login_required
