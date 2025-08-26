@@ -1,0 +1,21 @@
+{# Dropdown notification list for header.html #}
+{% for n in notifications %}
+<li class="notification-item dropdown-item noti-item {% if n.is_read %}noti-read{% else %}noti-unread bg-light{% endif %}" data-id="{{ n.id }}">
+    <div class="d-flex align-items-start">
+        <div class="flex-grow-1">
+            <div class="fw-bold small">{{ n.notification.title }}</div>
+            <div class="small text-muted">{{ n.notification.message|truncate(80) }}</div>
+            <div class="text-end text-secondary small mt-1">{{ n.created_at.strftime('%H:%M %d/%m/%Y') }}</div>
+        </div>
+        {% if not n.is_read %}
+        <span class="badge bg-warning ms-2">Mới</span>
+        {% endif %}
+    </div>
+</li>
+{% endfor %}
+<li class="dropdown-divider"></li>
+<li>
+    <button class="dropdown-item text-center text-primary" id="mark-all-read-btn" type="button">
+        <i class="fas fa-check-double me-1"></i>Đánh dấu tất cả đã đọc
+    </button>
+</li>
