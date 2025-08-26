@@ -3,20 +3,58 @@ from sqlalchemy.orm import joinedload
 from eventapp.models import (
     User, Event, TicketType, Review, EventCategory, 
     EventTrendingLog, DiscountCode, Ticket, Payment, 
-    UserNotification, CustomerGroup,Notification,PaymentMethod
+    UserNotification, CustomerGroup, PaymentMethod, Notification
 )
+from flask import render_template_string
 from eventapp import db
 from datetime import datetime, timedelta
+from wtforms.validators import ValidationError
+import uuid
+import os
+import hmac
+import hashlib
+from flask import request
+import pytz
 
+# User related functions
 def check_user(username):
+    """Kiểm tra người dùng theo username"""
     return User.query.filter(User.username == username).first()
 
 def check_email(email):
+    """Kiểm tra người dùng theo email"""
     return User.query.filter(User.email == email).first()
 
 def get_user_by_username(username):
+    """Lấy ID người dùng theo username"""
     user = User.query.filter(User.username == username).first()
     return user.id if user else None
+
+def get_user_tickets(user_id):
+    """Lấy vé của người dùng"""
+    return Ticket.query.filter_by(user_id=user_id).all()
+
+def get_user_events(user_id, page=1, per_page=10):
+    """Lấy sự kiện của organizer với phân trang"""
+    return Event.query.filter_by(organizer_id=user_id).order_by(Event.start_time.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+
+def get_user_payments(user_id):
+    """Lấy thanh toán của người dùng"""
+    return Payment.query.filter_by(user_id=user_id).all()
+
+def get_user_notifications(user_id):
+    """Lấy thông báo của người dùng"""
+    return UserNotification.query.filter_by(user_id=user_id).order_by(UserNotification.created_at.desc()).all()
+
+def get_user_customer_group(user):
+    """Lấy nhóm khách hàng của người dùng"""
+    try:
+        return user.get_customer_group()
+    except Exception as e:
+        print(f"Error getting user group: {e}")
+        return CustomerGroup.new
 
 # Event related functions
 def get_featured_events(limit=3):
@@ -66,7 +104,36 @@ def calculate_event_stats(active_ticket_types, all_reviews):
         'review_count': len(all_reviews)
     }
 
-def search_events(page=1, per_page=12, category='', search='', start_date='', end_date='', location='', price_min=None, price_max=None):
+def get_all_events_revenue_stats():
+    """Lấy thống kê doanh thu cho tất cả sự kiện"""
+    events = db.session.query(Event).options(
+        joinedload(Event.ticket_types)
+    ).filter_by(is_active=True).all()
+
+    stats = []
+    total_revenue = 0
+    for event in events:
+        active_ticket_types = [tt for tt in event.ticket_types if tt.is_active]
+        stat = calculate_event_stats(active_ticket_types, event.reviews.all())
+        stats.append({
+            'event_id': event.id,
+            'title': event.title,
+            'total_tickets': stat['total_tickets'],
+            'sold_tickets': stat['sold_tickets'],
+            'available_tickets': stat['available_tickets'],
+            'revenue': stat['revenue'],
+            'ticket_types': [{
+                'name': tt.name,
+                'price': float(tt.price),
+                'total_quantity': tt.total_quantity,
+                'sold_quantity': tt.sold_quantity
+            } for tt in active_ticket_types]
+        })
+        total_revenue += stat['revenue']
+    
+    return stats, total_revenue
+
+def search_events(page=1, per_page=12, category='', search='', start_date='', end_date='', location='', min_price=None, max_price=None):
     """Tìm kiếm và lọc sự kiện"""
     query = Event.query.filter_by(is_active=True)
 
@@ -76,31 +143,27 @@ def search_events(page=1, per_page=12, category='', search='', start_date='', en
     if search:
         query = query.filter(Event.title.ilike(f'%{search}%'))
 
-    from datetime import datetime
+    if location:
+        query = query.filter(Event.location.ilike(f'%{location}%'))
+
     if start_date:
         try:
             start_dt = datetime.strptime(start_date, '%Y-%m-%d')
             query = query.filter(Event.start_time >= start_dt)
         except:
             pass
+
     if end_date:
         try:
             end_dt = datetime.strptime(end_date, '%Y-%m-%d')
-            query = query.filter(Event.start_time <= end_dt)
+            query = query.filter(Event.end_time <= end_dt)
         except:
             pass
 
-    if location:
-        query = query.filter(Event.location.ilike(f'%{location}%'))
-
-    if price_min is not None:
-        query = query.join(Event.ticket_types).filter(TicketType.price >= price_min)
-    if price_max is not None:
-        # Nếu lọc miễn phí, chỉ lấy sự kiện có vé giá 0
-        if price_max == 0:
-            query = query.join(Event.ticket_types).filter(TicketType.price == 0)
-        else:
-            query = query.join(Event.ticket_types).filter(TicketType.price <= price_max)
+    if min_price is not None:
+        query = query.join(Event.ticket_types).filter(TicketType.price >= min_price)
+    if max_price is not None:
+        query = query.join(Event.ticket_types).filter(TicketType.price <= max_price)
 
     return query.order_by(Event.start_time.desc()).paginate(
         page=page, per_page=per_page, error_out=False
@@ -123,40 +186,14 @@ def get_events_by_category(category):
         return None
 
 def get_category_title(category):
-    """Lấy tiêu đề danh mục"""
-    category_titles = {
-        'music': 'Âm Nhạc',
-        'sports': 'Thể Thao', 
-        'seminar': 'Hội Thảo',
-        'conference': 'Hội Nghị',
-        'festival': 'Lễ Hội',
-        'workshop': 'Workshop',
-        'party': 'Tiệc Party',
-        'competition': 'Cuộc Thi',
-        'other': 'Khác'
-    }
-    return category_titles.get(category.lower(), category.title())
-
-# User related functions
-def get_user_tickets(user_id):
-    """Lấy vé của người dùng"""
-    return Ticket.query.filter_by(user_id=user_id).all()
-
-def get_user_events(user_id):
-    """Lấy sự kiện của organizer"""
-    return Event.query.filter_by(organizer_id=user_id).all()
-
-def get_user_payments(user_id):
-    """Lấy thanh toán của người dùng"""
-    return Payment.query.filter_by(user_id=user_id).all()
-
-def get_user_notifications(user_id):
-    """Lấy thông báo của người dùng"""
-    return UserNotification.query.filter_by(user_id=user_id).order_by(UserNotification.created_at.desc()).all()
-
-def get_all_events():
-    """Lấy tất cả sự kiện (debug)"""
-    return Event.query.all()
+    """Lấy tiêu đề danh mục từ EventCategory enum"""
+    category_value = category.value if hasattr(category, 'value') else category
+    try:
+        EventCategory(category_value)
+        return category_value.title()
+    except ValueError:
+        print(f"Invalid category: {category_value}")
+        return 'Unknown'
 
 # Booking related functions
 def get_event_for_booking(event_id):
@@ -195,22 +232,233 @@ def validate_ticket_availability(tickets_data):
             return False, f'Không đủ vé loại {ticket_type.name if ticket_type else "Unknown"}'
     return True, None
 
-def get_user_customer_group(user):
-    """Lấy nhóm khách hàng của user"""
-    try:
-        return user.get_customer_group()
-    except Exception as e:
-        print(f"Error getting user group: {e}")
-        return CustomerGroup.new
-    
+def validate_ticket_types(ticket_types, event_id=None):
+    """Xác thực loại vé để tránh trùng lặp và kiểm tra ràng buộc"""
+    names = set()
+    for ticket in ticket_types:
+        if ticket['name'] in names:
+            raise ValidationError(f'Tên vé "{ticket["name"]}" bị trùng')
+        if ticket['price'] < 0:
+            raise ValidationError(f'Giá vé "{ticket["name"]}" phải không âm')
+        if ticket['total_quantity'] < 1:
+            raise ValidationError(f'Số lượng vé "{ticket["name"]}" phải ít nhất là 1')
+        if event_id and ticket.get('id'):
+            existing = TicketType.query.get(ticket['id'])
+            if existing and existing.event_id == event_id and ticket['total_quantity'] < existing.sold_quantity:
+                raise ValidationError(f'Không thể giảm số lượng vé dưới số vé đã bán cho "{ticket["name"]}"')
+        names.add(ticket['name'])
+    return True
 
-# ======================================== VNPay ========================================
-import os
-import hmac
-import hashlib
-from flask import request, jsonify, redirect, current_app
-import pytz
+def create_event(data, user_id):
+    """Tạo sự kiện mới"""
+    event = Event(
+        organizer_id=user_id,
+        title=data['title'],
+        description=data['description'],
+        category=EventCategory[data['category']],
+        start_time=data['start_time'],
+        end_time=data['end_time'],
+        location=data['location'],
+        is_active=True
+    )
+    db.session.add(event)
+    db.session.flush()  # Get event.id
 
+    # Create TicketType
+    ticket_type = TicketType(
+        event_id=event.id,
+        name=data['ticket_name'],
+        price=data['price'],
+        total_quantity=data['ticket_quantity'],
+        sold_quantity=0,
+        is_active=True
+    )
+    db.session.add(ticket_type)
+
+    # Upload poster if provided
+    if data['poster']:
+        event.upload_poster(data['poster'])
+
+    db.session.commit()
+    return event
+
+def create_event_with_tickets(data, user_id):
+    """Tạo sự kiện với nhiều loại vé"""
+    validate_ticket_types(data['ticket_types'])
+    event = Event(
+        organizer_id=user_id,
+        title=data['title'],
+        description=data['description'],
+        category=EventCategory[data['category']],
+        start_time=data['start_time'],
+        end_time=data['end_time'],
+        location=data['location'],
+        is_active=True
+    )
+    db.session.add(event)
+    db.session.flush()
+    for ticket_data in data['ticket_types']:
+        ticket_type = TicketType(
+            event_id=event.id,
+            name=ticket_data['name'],
+            price=ticket_data['price'],
+            total_quantity=ticket_data['total_quantity'],
+            sold_quantity=0,
+            is_active=True
+        )
+        db.session.add(ticket_type)
+    if data['poster']:
+        event.upload_poster(data['poster'])
+    db.session.commit()
+    return event
+
+def update_event(event_id, data, user_id):
+    """Cập nhật sự kiện"""
+    event = Event.query.get(event_id)
+    if not event or event.organizer_id != user_id:
+        raise ValueError('Event not found or not owned by user')
+
+    # Update fields if provided
+    if 'title' in data and data['title']:
+        event.title = data['title']
+    if 'description' in data and data['description']:
+        event.description = data['description']
+    if 'category' in data and data['category']:
+        event.category = EventCategory[data['category']]
+    if 'start_time' in data and data['start_time']:
+        event.start_time = data['start_time']
+    if 'end_time' in data and data['end_time']:
+        event.end_time = data['end_time']
+    if 'location' in data and data['location']:
+        event.location = data['location']
+    if 'poster' in data and data['poster']:
+        event.upload_poster(data['poster'])
+
+    # Update TicketType (assume first one)
+    ticket_type = event.ticket_types.first()
+    if ticket_type:
+        if 'ticket_name' in data and data['ticket_name']:
+            ticket_type.name = data['ticket_name']
+        if 'price' in data and data['price'] is not None:
+            ticket_type.price = data['price']
+        if 'ticket_quantity' in data and data['ticket_quantity'] is not None:
+            if data['ticket_quantity'] < ticket_type.sold_quantity:
+                raise ValueError('Cannot reduce quantity below sold tickets')
+            ticket_type.total_quantity = data['ticket_quantity']
+
+    db.session.commit()
+    return event
+
+def update_event_with_tickets(event_id, data, user_id):
+    """Cập nhật sự kiện với nhiều loại vé"""
+    validate_ticket_types(data['ticket_types'], event_id)
+    event = Event.query.get(event_id)
+    if not event or event.organizer_id != user_id:
+        raise ValueError('Sự kiện không tồn tại hoặc không thuộc quyền sở hữu')
+
+    # Cập nhật các trường của sự kiện
+    if 'title' in data and data['title']:
+        event.title = data['title']
+    if 'description' in data and data['description']:
+        event.description = data['description']
+    if 'category' in data and data['category']:
+        event.category = EventCategory[data['category']]
+    if 'start_time' in data and data['start_time']:
+        event.start_time = data['start_time']
+    if 'end_time' in data and data['end_time']:
+        event.end_time = data['end_time']
+    if 'location' in data and data['location']:
+        event.location = data['location']
+    if 'poster' in data and data['poster']:
+        event.upload_poster(data['poster'])
+
+    # Cập nhật loại vé
+    existing_ticket_ids = {tt.id: tt for tt in event.ticket_types}
+    new_ticket_ids = set()
+    for ticket_data in data.get('ticket_types', []):
+        ticket_id = ticket_data.get('id')
+        if ticket_id and ticket_id in existing_ticket_ids:
+            ticket = existing_ticket_ids[ticket_id]
+            ticket.name = ticket_data['name']
+            ticket.price = ticket_data['price']
+            if ticket_data['total_quantity'] < ticket.sold_quantity:
+                raise ValidationError(f'Không thể giảm số lượng vé dưới số vé đã bán cho {ticket.name}')
+            ticket.total_quantity = ticket_data['total_quantity']
+            new_ticket_ids.add(ticket_id)
+        else:
+            ticket = TicketType(
+                event_id=event.id,
+                name=ticket_data['name'],
+                price=ticket_data['price'],
+                total_quantity=ticket_data['total_quantity'],
+                sold_quantity=0,
+                is_active=True
+            )
+            db.session.add(ticket)
+
+    # Xóa các loại vé không còn trong danh sách
+    for ticket_id, ticket in existing_ticket_ids.items():
+        if ticket_id not in new_ticket_ids:
+            db.session.delete(ticket)
+
+    db.session.commit()
+    return event
+
+def delete_event(event_id, user_id):
+    """Xóa sự kiện (đặt is_active=False)"""
+    event = Event.query.get(event_id)
+    if not event or event.organizer_id != user_id:
+        raise ValueError('Event not found or not owned by user')
+    event.is_active = False
+    db.session.commit()
+
+def bulk_delete_events(event_ids, user_id):
+    """Xóa nhiều sự kiện"""
+    for event_id in event_ids:
+        delete_event(event_id, user_id)
+
+# Payment and ticket cleanup functions
+def create_payment(user_id, amount, payment_method, status, transaction_id, discount_code=None):
+    """
+    Tạo một đối tượng Payment mới.
+    """
+    payment = Payment(
+        user_id=user_id,
+        amount=amount,
+        payment_method=PaymentMethod(payment_method),
+        status=status,
+        transaction_id=transaction_id
+    )
+    if discount_code:
+        dc = DiscountCode.query.filter_by(code=discount_code).first()
+        if dc:
+            payment.discount_code = dc
+    db.session.add(payment)
+    return payment
+
+def update_user_and_event_after_payment(user_id, event_id, amount):
+    """Cập nhật tổng chi tiêu của user và tính lại điểm trending cho event"""
+    user = User.query.get(user_id)
+    event = Event.query.get(event_id)
+    if user and amount:
+        user.total_spent = (user.total_spent or 0) + amount
+    if event and event.trending_log:
+        event.trending_log.calculate_score()
+    db.session.commit()
+
+def cleanup_unpaid_tickets(timeout_minutes=1):
+    """Xóa các vé chưa thanh toán sau thời gian quy định"""
+    expire_time = datetime.utcnow() - timedelta(minutes=timeout_minutes)
+    tickets = Ticket.query.filter(
+        Ticket.is_paid == False,
+        Ticket.purchase_date == None,
+        Ticket.created_at < expire_time
+    ).all()
+    for ticket in tickets:
+        db.session.delete(ticket)
+    db.session.commit()
+
+# VNPay functions
 def vnpay_encode(value):
     from urllib.parse import quote_plus
     return quote_plus(str(value), safe='')
@@ -280,9 +528,6 @@ def vnpay_response_message(code):
     }
     return mapping.get(code, "Lỗi không xác định.")
 
-from flask import request, redirect, render_template_string
-import urllib.parse
-
 def vnpay_redirect_flask():
     vnp_ResponseCode = request.args.get('vnp_ResponseCode')
     vnp_TxnRef = request.args.get('vnp_TxnRef')
@@ -293,15 +538,11 @@ def vnpay_redirect_flask():
     message = vnpay_response_message(vnp_ResponseCode)
     payment_success = vnp_ResponseCode == '00'
 
-    
-
     payment = Payment.query.filter_by(transaction_id=vnp_TxnRef).first()
-
 
     if payment and payment_success:
         payment.status = True
         payment.paid_at = datetime.utcnow()
-        # Cập nhật các ticket liên quan
         tickets = Ticket.query.filter_by(payment_id=payment.id, user_id=payment.user_id, is_paid=False).all()
 
         if tickets:
@@ -309,22 +550,17 @@ def vnpay_redirect_flask():
         for ticket in tickets:
             ticket.is_paid = True
             ticket.purchase_date = datetime.utcnow()
-            # Tạo QR code dựa trên uuid của ticket
             ticket.generate_qr_code()
-            # Cập nhật sold_quantity
             if ticket.ticket_type:
                 ticket.ticket_type.sold_quantity += 1
-        # Cập nhật DiscountCode nếu có
         if payment.discount_code:
             payment.discount_code.used_count += 1
-        # Tạo notification
         notif = Notification(
             event_id=event_id,
             title="Thanh toán thành công",
             message=f"Bạn đã thanh toán thành công đơn hàng {payment.transaction_id}.",
             notification_type="payment"
         )
-        # Gửi email vé cho user
         from eventapp.utils import send_ticket_email
         user = payment.user
         ticket_infos = []
@@ -336,7 +572,6 @@ def vnpay_redirect_flask():
                 'uuid': ticket.uuid
             })
         email_subject = f"Vé điện tử cho đơn hàng {payment.transaction_id}"
-        # Tạo nội dung HTML đẹp, thân thiện
         html_body = f"""
         <div style='font-family:sans-serif;max-width:80%;margin:auto;background:#f9f9f9;border-radius:10px;padding:32px 24px 24px 24px;'>
             <div style='text-align:center;'>
@@ -377,7 +612,6 @@ def vnpay_redirect_flask():
             send_ticket_email(user.email, email_subject, html_body, tickets=ticket_infos)
         except Exception as e:
             print(f"[EMAIL ERROR] Không gửi được vé: {e}")
-        # Cập nhật thông tin người dùng và sự kiện sau khi thanh toán
         update_user_and_event_after_payment(payment.user_id, event_id, payment.amount)
         db.session.add(notif)
         db.session.flush()
@@ -394,7 +628,6 @@ def vnpay_redirect_flask():
         db.session.flush()
         notif.send_to_user(payment.user)
 
-    # Redirect về trang nội bộ
     redirect_url = '/my-tickets'
     if payment_success:
         redirect_url += '?payment_result=success'
@@ -463,4 +696,62 @@ def cleanup_unpaid_tickets(timeout_minutes=1):
     for ticket in tickets:
         db.session.delete(ticket)
     db.session.commit()
+
+# ========== Review DAO ========== #
+def get_user_review(event_id, user_id):
+    """Lấy review của user cho sự kiện (nếu có)"""
+    return Review.query.filter_by(event_id=event_id, user_id=user_id, parent_review_id=None).first()
+
+def user_can_review(event_id, user_id):
+    """Chỉ customer đã mua vé, chưa review mới được review"""
+    from eventapp.models import Ticket, User
+    user = User.query.get(user_id)
+    if not user or user.role.value != 'customer':
+        return False
+    has_ticket = Ticket.query.filter_by(user_id=user_id, event_id=event_id, is_paid=True).first()
+    review = get_user_review(event_id, user_id)
+    return bool(has_ticket) and (review is None)
+
+def get_review_replies(review_id):
+    """Lấy replies cho 1 review"""
+    return Review.query.filter_by(parent_review_id=review_id).order_by(Review.created_at.asc()).all()
+
+def create_or_update_review(event_id, user_id, content, rating):
+    from datetime import datetime
+    review = get_user_review(event_id, user_id)
+    if review:
+        review.content = content
+        review.rating = rating
+        review.updated_at = datetime.utcnow()
+    else:
+        review = Review(event_id=event_id, user_id=user_id, rating=rating, comment=content, created_at=datetime.utcnow())
+        db.session.add(review)
+    db.session.commit()
+    return review
+
+def create_review_reply(parent_review_id, user_id, content):
+    from datetime import datetime
+    from eventapp.models import Notification, UserNotification
+    parent = Review.query.get(parent_review_id)
+    if not parent:
+        return None
+    reply = Review(event_id=parent.event_id, user_id=user_id, rating=None, comment=content, parent_review_id=parent_review_id, created_at=datetime.utcnow())
+    db.session.add(reply)
+    db.session.commit()
+    # Tạo notification cho customer đã review
+    from eventapp.models import User
+    customer = User.query.get(parent.user_id)
+    if customer:
+        notif = Notification(
+            event_id=parent.event_id,
+            title="Phản hồi đánh giá của bạn",
+            message=f"Đánh giá của bạn đã được phản hồi: {content}",
+            notification_type="review_reply"
+        )
+        db.session.add(notif)
+        db.session.commit()
+        user_notif = UserNotification(user_id=customer.id, notification_id=notif.id)
+        db.session.add(user_notif)
+        db.session.commit()
+    return reply
 

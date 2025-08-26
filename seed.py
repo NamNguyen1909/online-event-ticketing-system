@@ -29,7 +29,10 @@ def generate_phone_number():
 def create_users(num_users=50):
     """Tạo người dùng giả"""
     users = []
+    
+    # Đảm bảo email duy nhất
     used_emails = set()
+
     # Tạo admin
     admin_email = 'admin@example.com'
     admin = User(
@@ -43,14 +46,16 @@ def create_users(num_users=50):
     )
     users.append(admin)
     used_emails.add(admin_email)
+
     # Tạo organizer
     for i in range(5):
-        email = f'organizer{i+1}@example.com'
-        while email in used_emails:
-            email = fake.email()
+        org_email = f'organizer{i+1}@example.com'
+        while org_email in used_emails:
+            org_email = f'organizer{i+1}_{random.randint(1,9999)}@example.com'
         organizer = User(
             username=f'organizer_{i+1}',
-            email=email,
+            email=org_email,
+
             password_hash=generate_password_hash('password123'),
             role=UserRole.organizer,
             phone=generate_phone_number(),
@@ -59,28 +64,42 @@ def create_users(num_users=50):
             created_at=fake.date_time_between(start_date='-2y', end_date='now')
         )
         users.append(organizer)
-        used_emails.add(email)
-    # Tạo staff
+        
+        used_emails.add(org_email)
+
+    # Tạo staff, gán creator_id là organizer ngẫu nhiên
+    organizers = [u for u in users if u.role == UserRole.organizer]
     for i in range(3):
-        email = f'staff{i+1}@example.com'
-        while email in used_emails:
-            email = fake.email()
+        staff_email = f'staff{i+1}@example.com'
+        while staff_email in used_emails:
+            staff_email = f'staff{i+1}_{random.randint(1,9999)}@example.com'
         staff = User(
             username=f'staff_{i+1}',
-            email=email,
+            email=staff_email,
+
             password_hash=generate_password_hash('password123'),
             role=UserRole.staff,
             phone=generate_phone_number(),
             total_spent=Decimal('0'),
-            is_active=True
+            is_active=True,
+            creator_id=random.choice(organizers).id if organizers else None
         )
         users.append(staff)
-        used_emails.add(email)
+
+        used_emails.add(staff_email)
+
     # Tạo customers
     for i in range(num_users - 9):
+        # Sinh email unique
         email = fake.email()
+        tries = 0
         while email in used_emails:
             email = fake.email()
+            tries += 1
+            if tries > 10:
+                email = f'customer{i}_{random.randint(1,99999)}@example.com'
+        used_emails.add(email)
+
         customer = User(
             username=fake.user_name() + str(i),
             email=email,
@@ -92,7 +111,8 @@ def create_users(num_users=50):
             created_at=fake.date_time_between(start_date='-1y', end_date='now')
         )
         users.append(customer)
-        used_emails.add(email)
+
+
     db.session.add_all(users)
     db.session.commit()
     return users
@@ -101,11 +121,12 @@ def create_events(users, num_events=30):
     """Tạo sự kiện giả"""
     events = []
     organizers = [u for u in users if u.role == UserRole.organizer]
-    
+    staff_users = [u for u in users if u.role == UserRole.staff]
+
     for i in range(num_events):
         start_time = fake.date_time_between(start_date='-1m', end_date='+3m')
         end_time = start_time + timedelta(hours=random.randint(3, 12))
-        
+
         event = Event(
             organizer_id=random.choice(organizers).id,
             title=fake.sentence(nb_words=4).replace('.', ''),
@@ -117,8 +138,14 @@ def create_events(users, num_events=30):
             is_active=random.choice([True, True, True, False]),  # 75% active
             created_at=fake.date_time_between(start_date='-2m', end_date='now')
         )
+        # Gán staff cho event (1-3 staff ngẫu nhiên)
+        if staff_users:
+            num_staff = random.randint(1, min(3, len(staff_users)))
+            selected_staff = random.sample(staff_users, num_staff)
+            for staff in selected_staff:
+                event.staff.append(staff)
         events.append(event)
-    
+
     db.session.add_all(events)
     db.session.commit()
     return events
@@ -341,7 +368,6 @@ def create_notifications_and_user_notifications(users, events, num_notifications
                 user_id=user.id,
                 notification_id=notification.id,
                 is_read=random.choice([True, False]),
-                is_email_sent=random.choice([True, False]),
                 created_at=notification.created_at + timedelta(minutes=random.randint(1, 60))
             )
             
@@ -384,20 +410,26 @@ def create_event_trending_logs(events):
 
 def seed_database():
     """Chạy toàn bộ quá trình seed database"""
+    print("🌱 Bắt đầu seed database...")
     try:
-        print("🌱 Bắt đầu seed database...")
-        
         # Kiểm tra xem đã có dữ liệu chưa
-        existing_users = User.query.first()
-        if existing_users:
-            print("📊 Database đã có dữ liệu, bỏ qua seed")
-            return
-        
+        # existing_users = User.query.first()
+        # if existing_users:
+        #     print("📊 Database đã có dữ liệu, bỏ qua seed")
+        #     return
+
         print("🧹 Xóa dữ liệu cũ...")
+        from sqlalchemy import text
+        # Xóa bảng liên kết event_staff trước để tránh lỗi khóa ngoại
+        db.session.execute(text('DELETE FROM event_staff;'))
+        db.session.commit()
         # Xóa từng bảng một cách an toàn
         UserNotification.query.delete()
         Notification.query.delete()
+        db.session.execute(text('SET FOREIGN_KEY_CHECKS=0;'))
         Review.query.delete()
+        db.session.commit()
+        db.session.execute(text('SET FOREIGN_KEY_CHECKS=1;'))
         EventTrendingLog.query.delete()
         Ticket.query.delete()
         Payment.query.delete()
@@ -406,32 +438,32 @@ def seed_database():
         Event.query.delete()
         User.query.delete()
         db.session.commit()
-        
+
         # Tạo dữ liệu mới
         print("👥 Tạo users...")
         users = create_users(50)
-        
+
         print("🎉 Tạo events...")
         events = create_events(users, 30)
-        
+
         print("🎫 Tạo ticket types...")
         ticket_types = create_ticket_types(events)
-        
+
         print("🏷️ Tạo discount codes...")
         discount_codes = create_discount_codes(15)
-        
+
         print("💳 Tạo tickets và payments...")
         tickets, payments = create_tickets_and_payments(users, ticket_types, discount_codes, 300)
-        
+
         print("⭐ Tạo reviews...")
         reviews = create_reviews(users, events, 150)
-        
+
         print("📢 Tạo notifications...")
         notifications, user_notifications = create_notifications_and_user_notifications(users, events, 25)
-        
+
         print("📊 Tạo trending logs...")
         trending_logs = create_event_trending_logs(events)
-        
+
         print("✅ Seed database hoàn thành!")
         print(f"📊 Tạo thành công:")
         print(f"   - {len(users)} users")
@@ -443,11 +475,9 @@ def seed_database():
         print(f"   - {len(notifications)} notifications")
         print(f"   - {len(user_notifications)} user notifications")
         print(f"   - {len(trending_logs)} trending logs")
-        
     except Exception as e:
         print(f"❌ Lỗi khi seed database: {e}")
         db.session.rollback()
-        raise e
 
 def create_app():
     """Tạo Flask app cho việc seeding"""
