@@ -44,17 +44,17 @@ class TimeComparison(object):
 
 # Form for create event
 class CreateEventForm(FlaskForm):
-    ticket_name = StringField("Tên vé", validators=[DataRequired(), Length(min=3, max=255)])
+    ticket_name = StringField("Tên vé", validators=[Optional(), Length(min=3, max=255)])
     title = StringField('Tiêu Đề', validators=[DataRequired(), Length(min=3, max=255)])
     description = TextAreaField('Mô Tả', validators=[DataRequired(), Length(max=5000)])
     category = SelectField('Danh Mục', validators=[DataRequired()], choices=[(cat.value, cat.name.title()) for cat in EventCategory])
-    price = DecimalField("Giá vé", validators=[DataRequired(), NumberRange(min=0)], places=2)
+    price = DecimalField("Giá vé", validators=[Optional(), NumberRange(min=0)], places=2)
     start_time = DateTimeLocalField('Thời Gian Bắt Đầu', validators=[DataRequired()], format='%Y-%m-%dT%H:%M')
     end_time = DateTimeLocalField('Thời Gian Kết Thúc', validators=[DataRequired()], format='%Y-%m-%dT%H:%M')
     location = StringField('Địa Điểm', validators=[DataRequired(), Length(max=500)])
     poster = FileField('Poster', validators=[Optional(), FileAllowed(['jpg', 'png'], 'Chỉ cho phép ảnh!')])
     ticket_quantity = IntegerField("Số lượng vé", validators=[
-        DataRequired(),
+        Optional(),
         NumberRange(min=1, message="Số lượng phải lớn hơn 0")
     ])
 
@@ -78,14 +78,7 @@ class UpdateEventForm(CreateEventForm):
     def validate_end_time(self, field):
         if self.start_time.data and field.data and self.start_time.data >= field.data:
             raise ValidationError('Thời gian kết thúc phải sau thời gian bắt đầu.')
-from eventapp.models import PaymentMethod, Ticket,TicketType
-from eventapp import dao
-from flask import flash, jsonify, render_template, request, abort, session, redirect, url_for
-from flask_login import login_required, current_user
-from datetime import datetime, timedelta
 
-from flask import Blueprint, request, jsonify, redirect
-from eventapp.dao import create_payment_url_flask, vnpay_redirect_flask,cleanup_unpaid_tickets
 @app.route('/')
 def index():
     """Trang chủ"""
@@ -98,7 +91,6 @@ def event_detail(event_id):
     try:
         logging.debug(f"Tìm kiếm sự kiện với ID: {event_id}")
         
-        # Load event với organizer
         event = dao.get_event_detail(event_id)
         
         if not event:
@@ -107,22 +99,17 @@ def event_detail(event_id):
         
         logging.debug(f"Đã tìm thấy sự kiện: {event.title}, Danh mục: {event.category}")
         
-        # Lấy các ticket types đang hoạt động
         active_ticket_types = dao.get_active_ticket_types(event.id)
         logging.debug(f"Đã tìm thấy {len(active_ticket_types)} loại vé đang hoạt động")
         
-        # Lấy reviews
         main_reviews = dao.get_event_reviews(event.id)
         logging.debug(f"Đã tìm thấy {len(main_reviews)} đánh giá")
         
-        # Lấy tất cả reviews để tính rating
         all_reviews = dao.get_all_event_reviews(event.id)
         
-        # Tính toán thống kê
         stats = dao.calculate_event_stats(active_ticket_types, all_reviews)
         logging.debug(f"Thống kê được tính toán: {stats}")
         
-        # Kiểm tra quyền trả lời review
         can_reply = False
         if current_user.is_authenticated:
             can_reply = current_user.role.value in ['staff', 'organizer']
@@ -155,7 +142,6 @@ def events():
     quick_date = request.args.get('quick_date', '')
     free = request.args.get('free', '')
 
-    # Xử lý quick_date
     today = datetime.today()
     if quick_date == 'today':
         start_date = today.strftime('%Y-%m-%d')
@@ -175,13 +161,10 @@ def events():
         last_day = next_month - timedelta(days=next_month.day)
         end_date = last_day.strftime('%Y-%m-%d')
 
-    # Xử lý miễn phí
     if free:
         price_max = 0
 
-    # Lấy danh sách thể loại cho dropdown
     categories = list(EventCategory)
-
     events = dao.search_events(page, 12, category, search, start_date, end_date, location, price_min, price_max)
     category_title = None
     if category:
@@ -304,13 +287,40 @@ def organizer_create_event():
     form = CreateEventForm()
     if form.validate_on_submit():
         try:
-            data = form.data
-            event = dao.create_event(data, current_user.id)
+            data = {
+                'title': form.title.data,
+                'description': form.description.data,
+                'category': form.category.data,
+                'start_time': form.start_time.data,
+                'end_time': form.end_time.data,
+                'location': form.location.data,
+                'poster': form.poster.data,
+                'ticket_types': []
+            }
+            ticket_names = request.form.getlist('ticket_names[]')
+            ticket_prices = request.form.getlist('ticket_prices[]')
+            ticket_quantities = request.form.getlist('ticket_quantities[]')
+            for i in range(len(ticket_names)):
+                if not ticket_names[i]:
+                    flash('Tên vé không được để trống.', 'danger')
+                    return render_template('organizer/CreateEvent.html', form=form)
+                try:
+                    price = float(ticket_prices[i])
+                    quantity = int(ticket_quantities[i])
+                except ValueError:
+                    flash('Giá vé hoặc số lượng không hợp lệ.', 'danger')
+                    return render_template('organizer/CreateEvent.html', form=form)
+                data['ticket_types'].append({
+                    'name': ticket_names[i],
+                    'price': price,
+                    'total_quantity': quantity
+                })
+            dao.create_event_with_tickets(data, current_user.id)
             flash('Tạo sự kiện thành công!', 'success')
             return redirect(url_for('organizer_my_events'))
         except Exception as e:
             db.session.rollback()
-            flash(f'Lỗi khi tạo sự kiện: {str(e)}', 'danger')
+            flash(f'Lỗi: {str(e)}', 'danger')
     
     return render_template('organizer/CreateEvent.html', form=form)
 
@@ -480,7 +490,30 @@ def organizer_revenue_reports():
     try:
         stats, total_revenue = dao.get_all_events_revenue_stats()
         stats = [stat for stat in stats if Event.query.get(stat['event_id']).organizer_id == current_user.id]
-        return render_template('organizer/RevenueReports.html', stats=stats, total_revenue=total_revenue)
+        chart_data = {
+            "type": "bar",
+            "data": {
+                "labels": [stat['title'] for stat in stats],
+                "datasets": [{
+                    "label": "Doanh thu (VNĐ)",
+                    "data": [stat['revenue'] for stat in stats],
+                    "backgroundColor": "#2d8cf0",
+                    "borderColor": "#2d8cf0",
+                    "borderWidth": 1
+                }]
+            },
+            "options": {
+                "scales": {
+                    "y": {"beginAtZero": True, "title": {"display": True, "text": "Doanh thu (VNĐ)"}},
+                    "x": {"title": {"display": True, "text": "Sự kiện"}}
+                },
+                "plugins": {
+                    "legend": {"display": True},
+                    "title": {"display": True, "text": "Doanh thu theo sự kiện"}
+                }
+            }
+        }
+        return render_template('organizer/RevenueReports.html', stats=stats, total_revenue=total_revenue, chart_data=chart_data)
     except Exception as e:
         logging.error(f"Lỗi trong organizer_revenue_reports: {str(e)}")
         abort(500)
@@ -556,7 +589,7 @@ def add_organizer_staff():
             is_active=True
         )
         db.session.add(new_staff)
-        db.session.flush()  # Để có ID
+        db.session.flush()
 
         if event_id:
             event = Event.query.get(int(event_id))
@@ -679,7 +712,6 @@ def book_ticket(event_id):
     try:
         logging.debug(f"[BOOK_TICKET] User {current_user.username} accessing event {event_id}")
         
-        # Load event
         event = dao.get_event_for_booking(event_id)
         
         if not event:
@@ -689,11 +721,9 @@ def book_ticket(event_id):
         
         logging.debug(f"[BOOK_TICKET] Found event: {event.title}")
         
-        # Load ticket types
         all_ticket_types = dao.get_all_ticket_types_for_event(event_id)
         logging.debug(f"[BOOK_TICKET] Event has {len(all_ticket_types)} ticket types")
         
-        # Lấy các ticket types khả dụng
         available_ticket_types = dao.get_available_ticket_types(all_ticket_types)
         logging.debug(f"[BOOK_TICKET] Available ticket types: {len(available_ticket_types)}")
         
@@ -702,11 +732,9 @@ def book_ticket(event_id):
             flash('Sự kiện này hiện tại đã hết vé.', 'warning')
             return redirect(url_for('event_detail', event_id=event_id))
         
-        # Lấy nhóm khách hàng
         user_group = dao.get_user_customer_group(current_user)
         logging.debug(f"[BOOK_TICKET] User group: {user_group}")
 
-        # Lấy mã giảm giá
         available_discounts = dao.get_user_discount_codes(user_group)
         logging.debug(f"[BOOK_TICKET] Found {len(available_discounts)} discount codes")
         
@@ -728,14 +756,13 @@ def book_ticket(event_id):
 @login_required
 def process_booking():
     """Xử lý đặt vé (AJAX)"""
-    cleanup_unpaid_tickets() #lazy cleanup ticket chưa thanh toán
+    dao.cleanup_unpaid_tickets()
     
     try:
         data = request.get_json()
         payment_method = data.get('payment_method')
         tickets_data = data.get('tickets')
         
-        # Log thông tin booking
         logging.debug("=== BOOKING INFORMATION ===")
         logging.debug(f"User: {current_user.username} (ID: {current_user.id})")
         logging.debug(f"Event ID: {data.get('event_id')}")
@@ -747,7 +774,6 @@ def process_booking():
         logging.debug(f"Total Amount: {data.get('total_amount')}")
         logging.debug("========================")
         
-        # Validation
         if not tickets_data or len(tickets_data) == 0:
             return jsonify({'success': False, 'message': 'Vui lòng chọn ít nhất một loại vé.'})
         
@@ -755,19 +781,12 @@ def process_booking():
         if total_tickets == 0:
             return jsonify({'success': False, 'message': 'Vui lòng chọn ít nhất một vé.'})
         
-        # Kiểm tra tồn kho
         is_valid, error_message = dao.validate_ticket_availability(tickets_data)
         if not is_valid:
             return jsonify({'success': False, 'message': error_message})
 
-
-
-        # Nếu chọn VNPay
         if payment_method == 'vnpay':
-            # Tạo transaction_id duy nhất
-            import uuid
             transaction_id = f"VNPAY_{uuid.uuid4().hex[:12]}"
-            # Tạo bản ghi Payment (status=False)
             payment = dao.create_payment(
                 user_id=current_user.id,
                 amount=data['total_amount'],
@@ -778,8 +797,6 @@ def process_booking():
             )
             db.session.commit()
 
-
-            # Tạo các vé với is_paid=False
             for ticket_info in tickets_data:
                 ticket_type = TicketType.query.get(ticket_info['ticket_type_id'])
                 event_id = ticket_type.event_id if ticket_type else None
@@ -793,18 +810,11 @@ def process_booking():
                         payment_id=payment.id
                     )
                     db.session.add(ticket)
-                    # Cập nhật sold_quantity tạm thời nếu muốn (hoặc chỉ tăng khi thanh toán thành công)
             db.session.commit()
 
-
-
-            # Tạo URL thanh toán VNPay
             payment_url = dao.create_payment_url_flask(data['total_amount'], txn_ref=transaction_id)
             return jsonify({'success': True, 'payment_url': payment_url})
         
-
-        # Nếu là phương thức khác (COD, chuyển khoản, ...)
-        # ...xử lý như cũ...
         return jsonify({'success': True, 'message': 'Đặt vé thành công!'})
         
     except Exception as e:
@@ -824,7 +834,7 @@ def vnpay_redirect():
     return dao.vnpay_redirect_flask()
 
 @app.route('/tickets/cleanup', methods=['POST'])
-def cleanup_unpaid_tickets():
+def cleanup():
     dao.cleanup_unpaid_tickets()
     return jsonify({'success': True, 'message': 'Cleanup unpaid tickets called'})
 
@@ -897,24 +907,3 @@ def get_event_data_full(event_id):
 def page_not_found(e):
     logging.error(f"Trang không tìm thấy: {request.url}")
     return render_template('404.html'), 404
-    
-
-@app.route('/vnpay/create_payment', methods=['POST'])
-def vnpay_create_payment():
-    data = request.get_json()
-    amount = data.get('amount')
-    txn_ref = data.get('txn_ref')
-    payment_url = create_payment_url_flask(amount, txn_ref)
-    return jsonify({'payment_url': payment_url})
-
-@app.route('/vnpay/redirect')
-def vnpay_redirect():
-    return vnpay_redirect_flask()
-
-# API/job xóa vé chưa thanh toán
-from datetime import datetime, timedelta
-
-@app.route('/tickets/cleanup', methods=['POST'])
-def cleanup():
-    cleanup_unpaid_tickets()
-    return jsonify({'cleanup_unpaid_tickets called'})
