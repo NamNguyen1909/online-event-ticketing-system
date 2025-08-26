@@ -119,6 +119,31 @@ a {
     font-size: 0.7rem;
 }
 
+/* Hero Section Mobile Layout */
+@media (max-width: 768px) {
+    .hero-section .row {
+        flex-direction: column-reverse !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .hero-section .col-lg-6 {
+        width: 100% !important;
+        text-align: center !important;
+        margin-bottom: 0 !important;
+    }
+    .hero-section .d-flex.gap-3 {
+        justify-content: center !important;
+        display: flex !important;
+        margin-top: 24px !important;
+        margin-bottom: 24px !important;
+    }
+    .hero-section .d-flex.flex-column {
+        align-items: center !important;
+        margin-top: 32px !important;
+    }
+}
+
 /* Search Bar */
 .form-control:focus {
     border-color: #ffc107;
