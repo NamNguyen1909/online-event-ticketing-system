@@ -1,6 +1,6 @@
 from eventapp import app, db, login_manager
 
-from eventapp.models import PaymentMethod, EventCategory, UserRole, User, Event, Ticket, TicketType
+from eventapp.models import PaymentMethod, EventCategory, Review, UserRole, User, Event, Ticket, TicketType
 
 from eventapp import dao
 from flask import flash, jsonify, render_template, request, abort, session, redirect, url_for
