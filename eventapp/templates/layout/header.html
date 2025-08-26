@@ -88,14 +88,14 @@
 
                     <!-- Menu cho Staff -->
                     {% if current_user and current_user.is_authenticated and current_user.role.value == 'staff' %}
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('events') }}">
-                                    <i class="fas fa-calendar-alt me-1"></i>Sự Kiện
-                                </a>
-                            </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('staff_scan') }}">
-                                <i class="fas fa-qrcode me-1"></i>Quét Vé
+                            <a class="nav-link" href="{{ url_for('events') }}">
+                                <i class="fas fa-calendar-alt me-1"></i>Sự Kiện
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('staff_scan_ticket') }}">
+                                <i class="fas fa-qrcode me-1"></i>Quét vé
                             </a>
                         </li>
                     {% endif %}
@@ -211,7 +211,7 @@
                                     {#<li><a class="dropdown-item" href="{{ url_for('organizer_dashboard') }}"><i class="fas fa-chart-bar me-2"></i>Dashboard</a></li>#}
                                     <li><a class="dropdown-item" href="{{ url_for('organizer_my_events') }}"><i class="fas fa-calendar me-2"></i>Sự Kiện Của Tôi</a></li>
                                 {% elif current_user.role.value == 'staff' %}
-                                    {# <li><a class="dropdown-item" href="{{ url_for('staff_scan') }}"><i class="fas fa-qrcode me-2"></i>Quét Vé</a></li> #}
+                                    <li><a class="dropdown-item" href="{{ url_for('staff_scan_ticket') }}"><i class="fas fa-qrcode me-2"></i>Quét Vé</a></li> 
                                 {% elif current_user.role.value == 'admin' %}
                                     <li><a class="dropdown-item" href="{{ url_for('admin_dashboard') }}"><i class="fas fa-tachometer-alt me-2"></i>Admin Dashboard</a></li>
                                 {% endif %}
