@@ -1,0 +1,124 @@
+{% extends 'layout/base.html' %}
+{% block title %}Quét vé - Check-in QR Code{% endblock %}
+
+{% block content %}
+<div class="container py-4 d-flex flex-column align-items-center justify-content-center" style="min-height: 80vh;">
+    <h2 class="mb-4 text-center"><i class="fas fa-qrcode me-2"></i>Quét mã QR vé sự kiện</h2>
+    <div class="row justify-content-center w-100">
+        <div class="col-12 d-flex flex-column align-items-center">
+            <div id="reader" class="qr-reader-responsive"></div>
+            <div id="scan-result" class="mt-4 w-100 text-center"></div>
+        </div>
+    </div>
+</div>
+<style>
+.qr-reader-responsive {
+    width: 100%;
+    max-width: 500px;
+    min-height: 300px;
+    aspect-ratio: 1/1;
+    border-radius: 16px;
+    box-shadow: 0 0 24px #b3b3b3;
+    background: #fff;
+    padding: 0;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+}
+.qr-reader-responsive video, .qr-reader-responsive canvas {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    aspect-ratio: 1/1 !important;
+    border-radius: 16px;
+    display: block;
+}
+/* Tăng kích thước QR box overlay */
+.qr-reader-responsive .qr-code-full-region {
+    width: 80% !important;
+    height: 80% !important;
+    left: 10% !important;
+    top: 10% !important;
+    border-radius: 12px !important;
+}
+@media (max-width: 600px) {
+    .qr-reader-responsive {
+        max-width: 100vw;
+        min-height: 200px;
+        aspect-ratio: 1/1;
+        border-radius: 10px;
+        box-shadow: 0 0 10px #b3b3b3;
+    }
+    .qr-reader-responsive video, .qr-reader-responsive canvas {
+        border-radius: 10px;
+    }
+    .qr-reader-responsive .qr-code-full-region {
+        border-radius: 8px !important;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script>
+console.log('[QR] Script loaded, preparing to start scanner...');
+function onScanSuccess(decodedText, decodedResult) {
+    console.log('[QR] Scan success:', decodedText, decodedResult);
+    document.getElementById('scan-result').innerHTML = '<div class="alert alert-info">Đang kiểm tra vé...</div>';
+    html5QrCode.pause(); // Tạm dừng scanner ngay khi quét thành công
+    fetch("/staff/scan-ticket", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({qr_data: decodedText})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('scan-result').innerHTML = '<div class="alert alert-success">' + data.message + '</div>';
+        } else {
+            document.getElementById('scan-result').innerHTML = '<div class="alert alert-danger">' + (data.message || 'Vé không hợp lệ!') + '</div>';
+        }
+        console.log('[QR] API response:', data);
+        setTimeout(() => {
+            html5QrCode.resume(); // Sau 2 giây, cho phép quét tiếp
+            document.getElementById('scan-result').innerHTML = '';
+        }, 2000);
+    })
+    .catch((err) => {
+        document.getElementById('scan-result').innerHTML = '<div class="alert alert-danger">Lỗi kết nối máy chủ!</div>';
+        console.log('[QR] API error:', err);
+        setTimeout(() => {
+            html5QrCode.resume();
+            document.getElementById('scan-result').innerHTML = '';
+        }, 2000);
+    });
+}
+function onScanFailure(error) {
+    // Called for every frame that does not match
+    // Uncomment below to see all scan attempts
+    // console.log('[QR] Scan failure:', error);
+}
+
+const qrRegion = document.querySelector('.qr-reader-responsive');
+const qrboxSize = qrRegion ? Math.floor(qrRegion.offsetWidth * 0.8) : 400;
+const html5QrCode = new Html5Qrcode("reader");
+console.log('[QR] Starting html5QrCode...', {qrboxSize});
+html5QrCode.start(
+  { facingMode: "environment" },
+  { fps: 10, qrbox: qrboxSize },
+  onScanSuccess,
+  onScanFailure
+).then(() => {
+    console.log('[QR] Scanner started successfully');
+}).catch(err => {
+    console.error('[QR] Scanner failed to start:', err);
+    if (err && err.name === 'NotAllowedError') {
+        alert('Trình duyệt đã chặn quyền truy cập camera. Hãy cho phép camera để quét mã QR!');
+    }
+});
+</script>
+{% endblock %}
