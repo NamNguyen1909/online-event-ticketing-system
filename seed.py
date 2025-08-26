@@ -29,11 +29,12 @@ def generate_phone_number():
 def create_users(num_users=50):
     """Tạo người dùng giả"""
     users = []
-    
+    used_emails = set()
     # Tạo admin
+    admin_email = 'admin@example.com'
     admin = User(
         username='admin',
-        email='admin@example.com',
+        email=admin_email,
         password_hash=generate_password_hash('admin123'),
         role=UserRole.admin,
         phone=generate_phone_number(),
@@ -41,12 +42,15 @@ def create_users(num_users=50):
         is_active=True
     )
     users.append(admin)
-    
+    used_emails.add(admin_email)
     # Tạo organizer
     for i in range(5):
+        email = f'organizer{i+1}@example.com'
+        while email in used_emails:
+            email = fake.email()
         organizer = User(
             username=f'organizer_{i+1}',
-            email=f'organizer{i+1}@example.com',
+            email=email,
             password_hash=generate_password_hash('password123'),
             role=UserRole.organizer,
             phone=generate_phone_number(),
@@ -55,12 +59,15 @@ def create_users(num_users=50):
             created_at=fake.date_time_between(start_date='-2y', end_date='now')
         )
         users.append(organizer)
-    
+        used_emails.add(email)
     # Tạo staff
     for i in range(3):
+        email = f'staff{i+1}@example.com'
+        while email in used_emails:
+            email = fake.email()
         staff = User(
             username=f'staff_{i+1}',
-            email=f'staff{i+1}@example.com',
+            email=email,
             password_hash=generate_password_hash('password123'),
             role=UserRole.staff,
             phone=generate_phone_number(),
@@ -68,12 +75,15 @@ def create_users(num_users=50):
             is_active=True
         )
         users.append(staff)
-    
+        used_emails.add(email)
     # Tạo customers
     for i in range(num_users - 9):
+        email = fake.email()
+        while email in used_emails:
+            email = fake.email()
         customer = User(
             username=fake.user_name() + str(i),
-            email=fake.email(),
+            email=email,
             password_hash=generate_password_hash('password123'),
             role=UserRole.customer,
             phone=generate_phone_number(),
@@ -82,7 +92,7 @@ def create_users(num_users=50):
             created_at=fake.date_time_between(start_date='-1y', end_date='now')
         )
         users.append(customer)
-    
+        used_emails.add(email)
     db.session.add_all(users)
     db.session.commit()
     return users
