@@ -5,6 +5,7 @@ from eventapp.models import (
     EventTrendingLog, DiscountCode, Ticket, Payment, 
     UserNotification, CustomerGroup, PaymentMethod, Notification
 )
+from flask import render_template_string
 from eventapp import db
 from datetime import datetime, timedelta
 from wtforms.validators import ValidationError
@@ -418,7 +419,9 @@ def bulk_delete_events(event_ids, user_id):
 
 # Payment and ticket cleanup functions
 def create_payment(user_id, amount, payment_method, status, transaction_id, discount_code=None):
-    """Tạo bản ghi thanh toán"""
+    """
+    Tạo một đối tượng Payment mới.
+    """
     payment = Payment(
         user_id=user_id,
         amount=amount,
@@ -462,10 +465,11 @@ def vnpay_encode(value):
 
 def create_payment_url_flask(amount, txn_ref):
     tz = pytz.timezone("Asia/Ho_Chi_Minh")
-    host_url = request.host_url.rstrip('/')
+    host_url=request.host_url.rstrip('/')
     vnp_TmnCode = os.environ.get('VNPAY_TMN_CODE')
     vnp_HashSecret = os.environ.get('VNPAY_HASH_SECRET')
     vnp_Url = 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'
+    backend_base_url = host_url
     vnp_ReturnUrl = f'{host_url}/vnpay/redirect'
 
     order_id = txn_ref or datetime.now(tz).strftime('%H%M%S')

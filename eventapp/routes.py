@@ -10,6 +10,7 @@ from wtforms.validators import DataRequired, Length, NumberRange, Optional, Vali
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
 from eventapp.auth import validate_email, validate_password
+from eventapp.dao import create_payment_url_flask, vnpay_redirect_flask,cleanup_unpaid_tickets
 from sqlalchemy.orm import joinedload
 import logging
 import uuid
@@ -756,37 +757,46 @@ def book_ticket(event_id):
 @login_required
 def process_booking():
     """Xử lý đặt vé (AJAX)"""
-    dao.cleanup_unpaid_tickets()
+    cleanup_unpaid_tickets() #lazy cleanup ticket chưa thanh toán
     
     try:
         data = request.get_json()
         payment_method = data.get('payment_method')
         tickets_data = data.get('tickets')
         
-        logging.debug("=== BOOKING INFORMATION ===")
-        logging.debug(f"User: {current_user.username} (ID: {current_user.id})")
-        logging.debug(f"Event ID: {data.get('event_id')}")
-        logging.debug(f"Tickets: {data.get('tickets')}")
-        logging.debug(f"Payment Method: {data.get('payment_method')}")
-        logging.debug(f"Discount Code: {data.get('discount_code', 'None')}")
-        logging.debug(f"Subtotal: {data.get('subtotal')}")
-        logging.debug(f"Discount Amount: {data.get('discount_amount')}")
-        logging.debug(f"Total Amount: {data.get('total_amount')}")
-        logging.debug("========================")
+        # Log thông tin booking để kiểm tra
+        print("=== BOOKING INFORMATION ===")
+        print(f"User: {current_user.username} (ID: {current_user.id})")
+        print(f"Event ID: {data.get('event_id')}")
+        print(f"Tickets: {data.get('tickets')}")
+        print(f"Payment Method: {data.get('payment_method')}")
+        print(f"Discount Code: {data.get('discount_code', 'None')}")
+        print(f"Subtotal: {data.get('subtotal')}")
+        print(f"Discount Amount: {data.get('discount_amount')}")
+        print(f"Total Amount: {data.get('total_amount')}")
+        print("========================")
         
-        if not tickets_data or len(tickets_data) == 0:
+        # Validation
+        if not data.get('tickets') or len(data.get('tickets')) == 0:
             return jsonify({'success': False, 'message': 'Vui lòng chọn ít nhất một loại vé.'})
         
-        total_tickets = sum(ticket['quantity'] for ticket in tickets_data)
+        total_tickets = sum(ticket['quantity'] for ticket in data.get('tickets'))
         if total_tickets == 0:
             return jsonify({'success': False, 'message': 'Vui lòng chọn ít nhất một vé.'})
         
-        is_valid, error_message = dao.validate_ticket_availability(tickets_data)
+        # Kiểm tra tồn kho
+        is_valid, error_message = dao.validate_ticket_availability(data.get('tickets'))
         if not is_valid:
             return jsonify({'success': False, 'message': error_message})
 
+
+
+        # Nếu chọn VNPay
         if payment_method == 'vnpay':
+            # Tạo transaction_id duy nhất
+            import uuid
             transaction_id = f"VNPAY_{uuid.uuid4().hex[:12]}"
+            # Tạo bản ghi Payment (status=False)
             payment = dao.create_payment(
                 user_id=current_user.id,
                 amount=data['total_amount'],
@@ -797,6 +807,8 @@ def process_booking():
             )
             db.session.commit()
 
+
+            # Tạo các vé với is_paid=False
             for ticket_info in tickets_data:
                 ticket_type = TicketType.query.get(ticket_info['ticket_type_id'])
                 event_id = ticket_type.event_id if ticket_type else None
@@ -810,15 +822,22 @@ def process_booking():
                         payment_id=payment.id
                     )
                     db.session.add(ticket)
+                    # Cập nhật sold_quantity tạm thời nếu muốn (hoặc chỉ tăng khi thanh toán thành công)
             db.session.commit()
 
+
+
+            # Tạo URL thanh toán VNPay
             payment_url = dao.create_payment_url_flask(data['total_amount'], txn_ref=transaction_id)
             return jsonify({'success': True, 'payment_url': payment_url})
         
+
+        # Nếu là phương thức khác (COD, chuyển khoản, ...)
+        # ...xử lý như cũ...
         return jsonify({'success': True, 'message': 'Đặt vé thành công!'})
         
     except Exception as e:
-        logging.error(f"Error in process_booking: {str(e)}")
+        print(f"Error in process_booking: {str(e)}")
         return jsonify({'success': False, 'message': 'Đã xảy ra lỗi khi xử lý đặt vé.'})
 
 @app.route('/vnpay/create_payment', methods=['POST'])
