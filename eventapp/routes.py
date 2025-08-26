@@ -78,7 +78,14 @@ class UpdateEventForm(CreateEventForm):
     def validate_end_time(self, field):
         if self.start_time.data and field.data and self.start_time.data >= field.data:
             raise ValidationError('Thời gian kết thúc phải sau thời gian bắt đầu.')
+from eventapp.models import PaymentMethod, Ticket,TicketType
+from eventapp import dao
+from flask import flash, jsonify, render_template, request, abort, session, redirect, url_for
+from flask_login import login_required, current_user
+from datetime import datetime, timedelta
 
+from flask import Blueprint, request, jsonify, redirect
+from eventapp.dao import create_payment_url_flask, vnpay_redirect_flask,cleanup_unpaid_tickets
 @app.route('/')
 def index():
     """Trang chủ"""
@@ -241,8 +248,8 @@ def profile():
 @app.route('/my-tickets')
 @login_required
 def my_tickets():
-    tickets = dao.get_user_tickets(current_user.id)
-    return render_template('my_tickets.html', tickets=tickets)
+    tickets = Ticket.query.filter_by(user_id=current_user.id, is_paid=True).order_by(Ticket.purchase_date.desc()).all()
+    return render_template('customer/MyTickets.html', tickets=tickets)
 
 @app.route('/my-events')
 @login_required
@@ -721,7 +728,7 @@ def book_ticket(event_id):
 @login_required
 def process_booking():
     """Xử lý đặt vé (AJAX)"""
-    dao.cleanup_unpaid_tickets()
+    cleanup_unpaid_tickets() #lazy cleanup ticket chưa thanh toán
     
     try:
         data = request.get_json()
@@ -753,9 +760,14 @@ def process_booking():
         if not is_valid:
             return jsonify({'success': False, 'message': error_message})
 
+
+
         # Nếu chọn VNPay
         if payment_method == 'vnpay':
+            # Tạo transaction_id duy nhất
+            import uuid
             transaction_id = f"VNPAY_{uuid.uuid4().hex[:12]}"
+            # Tạo bản ghi Payment (status=False)
             payment = dao.create_payment(
                 user_id=current_user.id,
                 amount=data['total_amount'],
@@ -766,6 +778,8 @@ def process_booking():
             )
             db.session.commit()
 
+
+            # Tạo các vé với is_paid=False
             for ticket_info in tickets_data:
                 ticket_type = TicketType.query.get(ticket_info['ticket_type_id'])
                 event_id = ticket_type.event_id if ticket_type else None
@@ -779,11 +793,18 @@ def process_booking():
                         payment_id=payment.id
                     )
                     db.session.add(ticket)
+                    # Cập nhật sold_quantity tạm thời nếu muốn (hoặc chỉ tăng khi thanh toán thành công)
             db.session.commit()
 
+
+
+            # Tạo URL thanh toán VNPay
             payment_url = dao.create_payment_url_flask(data['total_amount'], txn_ref=transaction_id)
             return jsonify({'success': True, 'payment_url': payment_url})
         
+
+        # Nếu là phương thức khác (COD, chuyển khoản, ...)
+        # ...xử lý như cũ...
         return jsonify({'success': True, 'message': 'Đặt vé thành công!'})
         
     except Exception as e:
@@ -876,3 +897,24 @@ def get_event_data_full(event_id):
 def page_not_found(e):
     logging.error(f"Trang không tìm thấy: {request.url}")
     return render_template('404.html'), 404
+    
+
+@app.route('/vnpay/create_payment', methods=['POST'])
+def vnpay_create_payment():
+    data = request.get_json()
+    amount = data.get('amount')
+    txn_ref = data.get('txn_ref')
+    payment_url = create_payment_url_flask(amount, txn_ref)
+    return jsonify({'payment_url': payment_url})
+
+@app.route('/vnpay/redirect')
+def vnpay_redirect():
+    return vnpay_redirect_flask()
+
+# API/job xóa vé chưa thanh toán
+from datetime import datetime, timedelta
+
+@app.route('/tickets/cleanup', methods=['POST'])
+def cleanup():
+    cleanup_unpaid_tickets()
+    return jsonify({'cleanup_unpaid_tickets called'})
