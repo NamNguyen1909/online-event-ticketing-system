@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bảng Điều Khiển Admin - EventHub</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    {% extends 'layout/base.html' %}
+    {% block title %}Bảng Điều Khiển Admin - EventHub{% endblock %}
+    {% block content %}
+    <div class="container">
+        <h1>Báo Cáo Doanh Thu Hệ Thống</h1>
+        <div class="card mb-3">
+            <div class="card-header">
+                Tổng Doanh Thu: {{ "{:,.0f} đ".format(total_revenue) }}
+            </div>
+            <div class="card-body">
+                <h2>Biểu Đồ Doanh Thu Theo Sự Kiện</h2>
+                <!-- Thêm các thuộc tính data-* để lưu trữ dữ liệu biểu đồ -->
+                <canvas id="revenueChart" 
+                        data-labels='{{ chart_data.labels | tojson }}'
+                        data-revenues='{{ chart_data.revenues | tojson }}'>
+                </canvas>
+            </div>
+        </div>
+        <div class="card mb-3">
+            <div class="card-header">
+                Chi Tiết Doanh Thu Sự Kiện
+            </div>
+            <div class="card-body">
+                {% if stats %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID Sự Kiện</th>
+                            <th>Tên Sự Kiện</th>
+                            <th>Tổng Vé</th>
+                            <th>Vé Đã Bán</th>
+                            <th>Vé Còn Lại</th>
+                            <th>Doanh Thu</th>
+                            <th>Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stat in stats %}
+                        <tr>
+                            <td>{{ stat.event_id }}</td>
+                            <td>{{ stat.title }}</td>
+                            <td>{{ stat.total_tickets }}</td>
+                            <td>{{ stat.sold_tickets }}</td>
+                            <td>{{ stat.available_tickets }}</td>
+                            <td>{{ "{:,.0f} đ".format(stat.revenue) }}</td>
+                            <td>
+                                <a href="{{ url_for('event_detail', event_id=stat.event_id) }}" class="btn btn-sm btn-info">Xem</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p>Chưa có sự kiện nào trong hệ thống.</p>
+                {% endif %}
+            </div>
+        </div>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-primary">Quản Lý Người Dùng</a>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-primary">Kiểm Duyệt Sự Kiện</a>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-primary">Cài Đặt Hệ Thống</a>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Quay Lại</a>
+    </div>
+    {% endblock %}
+    {% block extra_js %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Lấy thẻ canvas
+        var canvas = document.getElementById('revenueChart');
+        
+        // Lấy dữ liệu từ các thuộc tính data-*
+        var labels = JSON.parse(canvas.dataset.labels || '[]');
+        var revenues = JSON.parse(canvas.dataset.revenues || '[]');
+        
+        // Tạo biểu đồ
+        var ctx = canvas.getContext('2d');
+        var revenueChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Doanh Thu',
+                    data: revenues,
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString('vi-VN') + ' đ';
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Doanh thu: ' + context.parsed.y.toLocaleString('vi-VN') + ' đ';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+    {% endblock %}
+</body>
+</html>
