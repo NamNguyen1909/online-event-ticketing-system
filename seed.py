@@ -55,6 +55,7 @@ def create_users(num_users=50):
         organizer = User(
             username=f'organizer_{i+1}',
             email=org_email,
+
             password_hash=generate_password_hash('password123'),
             role=UserRole.organizer,
             phone=generate_phone_number(),
@@ -63,6 +64,7 @@ def create_users(num_users=50):
             created_at=fake.date_time_between(start_date='-2y', end_date='now')
         )
         users.append(organizer)
+        
         used_emails.add(org_email)
 
     # Tạo staff, gán creator_id là organizer ngẫu nhiên
@@ -74,6 +76,7 @@ def create_users(num_users=50):
         staff = User(
             username=f'staff_{i+1}',
             email=staff_email,
+
             password_hash=generate_password_hash('password123'),
             role=UserRole.staff,
             phone=generate_phone_number(),
@@ -82,6 +85,7 @@ def create_users(num_users=50):
             creator_id=random.choice(organizers).id if organizers else None
         )
         users.append(staff)
+
         used_emails.add(staff_email)
 
     # Tạo customers
@@ -95,6 +99,7 @@ def create_users(num_users=50):
             if tries > 10:
                 email = f'customer{i}_{random.randint(1,99999)}@example.com'
         used_emails.add(email)
+
         customer = User(
             username=fake.user_name() + str(i),
             email=email,
@@ -106,6 +111,7 @@ def create_users(num_users=50):
             created_at=fake.date_time_between(start_date='-1y', end_date='now')
         )
         users.append(customer)
+
 
     db.session.add_all(users)
     db.session.commit()

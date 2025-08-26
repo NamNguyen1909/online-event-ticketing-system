@@ -30,10 +30,10 @@
                             </a>
                         </li>
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="categoriesDropdown" role="button" 
+                            <!-- <a class="nav-link dropdown-toggle" href="#" id="categoriesDropdown" role="button" 
                                data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="fas fa-list me-1"></i>Danh Mục
-                            </a>
+                            </a> -->
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="{{ url_for('category', category='music') }}"><i class="fas fa-music me-2"></i>Âm Nhạc</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('category', category='sports') }}"><i class="fas fa-futbol me-2"></i>Thể Thao</a></li>
@@ -63,7 +63,7 @@
                                 <i class="fas fa-calendar-alt me-1"></i>Sự Kiện
                             </a>
                         </li>
-                        <li class="nav-item dropdown">
+                        <!-- <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="categoriesDropdown" role="button" 
                                data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="fas fa-list me-1"></i>Danh Mục
@@ -77,13 +77,12 @@
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ url_for('events') }}"><i class="fas fa-th me-2"></i>Tất Cả</a></li>
                             </ul>
-                        </li>
+                        </li> -->
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('my_tickets') }}">
                                 <i class="fas fa-ticket-alt me-1"></i>Vé Của Tôi
                             </a>
                         </li>
-
                     {% endif %}
 
                     <!-- Menu cho Staff -->
@@ -221,9 +220,6 @@
 
                 <!-- User Actions -->
                 <ul class="navbar-nav">
-
-
-                    <!-- Notifications - Hiện cho tất cả user đã đăng nhập -->
                     {% if current_user and current_user.is_authenticated %}
                     <li class="nav-item dropdown">
                         <a class="nav-link position-relative" href="#" id="notificationsDropdown" role="button" 
@@ -329,10 +325,12 @@
                         {% if current_user and current_user.is_authenticated %}
                             <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" 
                                role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <img src="{{ current_user.avatar_url or 'https://via.placeholder.com/32x32' }}" alt="Avatar" 
-                                     class="rounded-circle me-2" width="32" height="32">
+                                <img src="{{ current_user.avatar_url or 'https://via.placeholder.com/32x32' }}" 
+                                     alt="Avatar" class="rounded-circle me-2" width="32" height="32">
                                 <span class="d-none d-md-inline">{{ current_user.username }}</span>
-                                <span class="badge bg-secondary ms-1 d-none d-lg-inline">{{ current_user.role.value.title() }}</span>
+                                <span class="badge bg-secondary ms-1 d-none d-lg-inline">
+                                    {{ current_user.role.value.title() }}
+                                </span>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li class="dropdown-header">
@@ -340,33 +338,44 @@
                                     <div class="text-muted small">{{ current_user.role.value.title() }}</div>
                                 </li>
                                 <li><hr class="dropdown-divider"></li>
-                                
                                 <!-- Profile cho tất cả role -->
-                                {# <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user me-2"></i>Hồ Sơ</a></li> #}
-                                
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('profile') }}">
+                                        <i class="fas fa-user me-2"></i>Hồ Sơ
+                                    </a>
+                                </li>
                                 <!-- Menu riêng cho từng role -->
                                 {% if current_user.role.value == 'customer' %}
-                                    <li><a class="dropdown-item" href="{{ url_for('my_tickets') }}"><i class="fas fa-ticket-alt me-2"></i>Vé Của Tôi</a></li>
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('my_tickets') }}">
+                                            <i class="fas fa-ticket-alt me-2"></i>Vé Của Tôi
+                                        </a>
+                                    </li>
                                 {% elif current_user.role.value == 'organizer' %}
-                                    {#<li><a class="dropdown-item" href="{{ url_for('organizer_dashboard') }}"><i class="fas fa-chart-bar me-2"></i>Dashboard</a></li>#}
                                     <li><a class="dropdown-item" href="{{ url_for('organizer_my_events') }}"><i class="fas fa-calendar me-2"></i>Sự Kiện Của Tôi</a></li>
+
                                 {% elif current_user.role.value == 'staff' %}
                                     <li><a class="dropdown-item" href="{{ url_for('staff_scan_ticket') }}"><i class="fas fa-qrcode me-2"></i>Quét Vé</a></li> 
+
                                 {% elif current_user.role.value == 'admin' %}
                                     <li><a class="dropdown-item" href="{{ url_for('admin_dashboard') }}"><i class="fas fa-tachometer-alt me-2"></i>Admin Dashboard</a></li>
+                                {% elif current_user.role.value == 'staff' %}
+                                    {# <li><a class="dropdown-item" href="{{ url_for('staff_scan') }}"><i class="fas fa-qrcode me-2"></i>Quét Vé</a></li> #}
                                 {% endif %}
-                                
-                                {# <li><a class="dropdown-item" href="{{ url_for('settings') }}"><i class="fas fa-cog me-2"></i>Cài Đặt</a></li> #}
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal">
                                     <i class="fas fa-sign-out-alt me-2"></i>Đăng Xuất
                                 </a></li>
                             </ul>
-                        {% else %}
+                        </div>
+                    </li>
+                    {% else %}
+                        <!-- User chưa đăng nhập -->
+                        <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" 
                                role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <img src="https://via.placeholder.com/32x32/6c757d/ffffff?text=?" alt="Avatar" 
-                                     class="rounded-circle me-2" width="32" height="32">
+                                <img src="{{ url_for('static', filename='img/user-solid-full.svg') }}" alt="Avatar" 
+                                    class="rounded-circle me-2 align-middle" width="20" height="20">
                                 <span class="d-none d-md-inline">Khách</span>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
@@ -377,8 +386,8 @@
                                     <i class="fas fa-user-plus me-2"></i>Đăng Ký
                                 </a></li>
                             </ul>
-                        {% endif %}
-                    </li>
+                        </li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
