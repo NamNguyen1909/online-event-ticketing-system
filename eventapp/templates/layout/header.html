@@ -83,15 +83,16 @@
                                 <i class="fas fa-ticket-alt me-1"></i>Vé Của Tôi
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('orders') }}">
-                                <i class="fas fa-credit-card me-1"></i>Thanh Toán
-                            </a>
-                        </li>
+
                     {% endif %}
 
                     <!-- Menu cho Staff -->
                     {% if current_user and current_user.is_authenticated and current_user.role.value == 'staff' %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('events') }}">
+                                    <i class="fas fa-calendar-alt me-1"></i>Sự Kiện
+                                </a>
+                            </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('staff_scan') }}">
                                 <i class="fas fa-qrcode me-1"></i>Quét Vé
@@ -101,6 +102,11 @@
 
                     <!-- Menu cho Organizer -->
                     {% if current_user and current_user.is_authenticated and current_user.role.value == 'organizer' %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('events') }}">
+                                    <i class="fas fa-calendar-alt me-1"></i>Sự Kiện
+                                </a>
+                            </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('organizer_dashboard') }}">
                                 <i class="fas fa-chart-bar me-1"></i>Thống Kê
@@ -207,7 +213,6 @@
                                 <!-- Menu riêng cho từng role -->
                                 {% if current_user.role.value == 'customer' %}
                                     <li><a class="dropdown-item" href="{{ url_for('my_tickets') }}"><i class="fas fa-ticket-alt me-2"></i>Vé Của Tôi</a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('orders') }}"><i class="fas fa-shopping-bag me-2"></i>Đơn Hàng</a></li>
                                 {% elif current_user.role.value == 'organizer' %}
                                     <li><a class="dropdown-item" href="{{ url_for('organizer_dashboard') }}"><i class="fas fa-chart-bar me-2"></i>Dashboard</a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('my_events') }}"><i class="fas fa-calendar me-2"></i>Sự Kiện Của Tôi</a></li>

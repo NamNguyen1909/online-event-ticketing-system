@@ -1,65 +1,18 @@
 from eventapp import app, db, login_manager
-from eventapp.models import PaymentMethod, Ticket,TicketType
+from eventapp.models import PaymentMethod, Ticket, TicketType
 from eventapp import dao
 from flask import flash, jsonify, render_template, request, abort, session, redirect, url_for
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
+from eventapp.models import Review
+from eventapp.dao import create_payment_url_flask, vnpay_redirect_flask, cleanup_unpaid_tickets
 
-from flask import Blueprint, request, jsonify, redirect
-from eventapp.dao import create_payment_url_flask, vnpay_redirect_flask,cleanup_unpaid_tickets
 @app.route('/')
 def index():
     """Trang chủ"""
     featured_events = dao.get_featured_events()
     return render_template('index.html', events=featured_events)
 
-@app.route('/event/<int:event_id>')
-def event_detail(event_id):
-    """Chi tiết sự kiện"""
-    try:
-        print(f"Searching for event with ID: {event_id}")
-        
-        # Load event với organizer
-        event = dao.get_event_detail(event_id)
-        
-        if not event:
-            print(f"Event with ID {event_id} not found or not active")
-            abort(404)
-        
-        print(f"Found event: {event.title}, Category: {event.category}")
-        
-        # Lấy các ticket types đang hoạt động
-        active_ticket_types = dao.get_active_ticket_types(event.id)
-        print(f"Found {len(active_ticket_types)} active ticket types")
-        
-        # Lấy reviews
-        main_reviews = dao.get_event_reviews(event.id)
-        print(f"Found {len(main_reviews)} reviews")
-        
-        # Lấy tất cả reviews để tính rating
-        all_reviews = dao.get_all_event_reviews(event.id)
-        
-        # Tính toán thống kê
-        stats = dao.calculate_event_stats(active_ticket_types, all_reviews)
-        print(f"Stats calculated: {stats}")
-        
-        # Kiểm tra quyền trả lời review
-        can_reply = False
-        if current_user.is_authenticated:
-            can_reply = current_user.role.value in ['staff', 'organizer']
-        
-        return render_template('customer/EventDetail.html', 
-                             event=event, 
-                             ticket_types=active_ticket_types,
-                             reviews=main_reviews,
-                             stats=stats,
-                             can_reply=can_reply)
-                             
-    except Exception as e:
-        print(f"Error in event_detail: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        abort(500)
 
 @app.route('/events')
 def events():
@@ -105,13 +58,107 @@ def events():
     # Lấy danh sách thể loại cho dropdown
     from eventapp.models import EventCategory
     categories = list(EventCategory)
-
     events = dao.search_events(page, 12, category, search, start_date, end_date, location, price_min, price_max)
     category_title = None
     if category:
         from eventapp.dao import get_category_title
         category_title = get_category_title(category)
     return render_template('customer/EventList.html', events=events, categories=categories, category_title=category_title)
+
+@app.route('/event/<int:event_id>')
+def event_detail(event_id):
+    """Chi tiết sự kiện"""
+    try:
+        event = dao.get_event_detail(event_id)
+        if not event:
+            flash('Sự kiện không tồn tại.', 'warning')
+            return redirect(url_for('events'))
+        active_ticket_types = dao.get_active_ticket_types(event.id)
+        all_reviews = dao.get_all_event_reviews(event.id)
+        # Kiểm tra query param ?all_reviews=1 để hiển thị toàn bộ review
+        show_all = request.args.get('all_reviews') == '1'
+        if show_all:
+            main_reviews = all_reviews
+        else:
+            main_reviews = dao.get_event_reviews(event.id, limit=5)
+        stats = dao.calculate_event_stats(active_ticket_types, all_reviews)
+        can_reply = False
+        my_review = None
+        if current_user.is_authenticated:
+            if current_user.role.value in ['organizer', 'staff']:
+                can_reply = True
+            if current_user.role.value == 'customer':
+                my_review = dao.get_user_review(event.id, current_user.id)
+        return render_template('customer/EventDetail.html', 
+                             event=event, 
+                             ticket_types=active_ticket_types,
+                             reviews=main_reviews,
+                             stats=stats,
+                             can_reply=can_reply,
+                             my_review=my_review)
+    except Exception as e:
+        print(f"Error in event_detail: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        abort(500)
+
+# ========== Review Routes ========== #
+@app.route('/event/<int:event_id>/review', methods=['POST'])
+@login_required
+def add_review(event_id):
+    """Thêm review mới cho sự kiện (customer đã mua vé, chưa review)"""
+    if current_user.role.value != 'customer':
+        abort(403)
+    if not dao.user_can_review(event_id, current_user.id):
+        flash('Bạn không thể đánh giá sự kiện này.', 'warning')
+        return redirect(url_for('event_detail', event_id=event_id))
+    rating = int(request.form.get('rating', 0))
+    comment = request.form.get('comment', '').strip()
+    if not (1 <= rating <= 5):
+        flash('Vui lòng chọn số sao hợp lệ.', 'warning')
+        return redirect(url_for('event_detail', event_id=event_id))
+    dao.create_or_update_review(event_id, current_user.id, comment, rating)
+    flash('Đánh giá của bạn đã được gửi.', 'success')
+    return redirect(url_for('event_detail', event_id=event_id))
+
+
+
+@app.route('/review/<int:review_id>/reply', methods=['POST'])
+@login_required
+def reply_review(review_id):
+    """Reply review (chỉ organizer/staff)"""
+    if current_user.role.value not in ['organizer', 'staff']:
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'Bạn không có quyền trả lời đánh giá.'}), 403
+        abort(403)
+    # Hỗ trợ cả form và JSON
+    if request.is_json:
+        content = request.json.get('reply_content', '').strip()
+    else:
+        content = request.form.get('reply_content', '').strip()
+    if not content:
+        msg = 'Nội dung phản hồi không được để trống.'
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(msg, 'warning')
+        return redirect(request.referrer or url_for('index'))
+    reply = dao.create_review_reply(review_id, current_user.id, content)
+    if reply:
+        msg = 'Đã gửi phản hồi.'
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': True, 'message': msg})
+        flash(msg, 'success')
+    else:
+        msg = 'Không thể gửi phản hồi.'
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': msg}), 500
+        flash(msg, 'danger')
+    # Lấy event_id để redirect về trang chi tiết event
+    parent = Review.query.get(review_id)
+    event_id = parent.event_id if parent else None
+    if event_id:
+        return redirect(url_for('event_detail', event_id=event_id))
+    return redirect(url_for('index'))
 
 @app.route('/trending')
 def trending():
@@ -183,11 +230,6 @@ def my_events():
     events = dao.get_user_events(current_user.id)
     return render_template('my_events.html', events=events)
 
-@app.route('/orders')
-@login_required
-def orders():
-    payments = dao.get_user_payments(current_user.id)
-    return render_template('orders.html', payments=payments)
 
 @app.route('/settings')
 @login_required
@@ -214,7 +256,7 @@ def staff_scan():
         abort(403)
     return render_template('staff/scan.html')
 
-# Routes cho Organizer
+# # Routes cho Organizer
 @app.route('/organizer/dashboard')
 @login_required
 def organizer_dashboard():

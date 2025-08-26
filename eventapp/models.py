@@ -619,7 +619,7 @@ class Review(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     event_id = db.Column(db.Integer, db.ForeignKey('events.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    rating = db.Column(db.Integer, nullable=False)  # 1-5 stars
+    rating = db.Column(db.Integer, nullable=True)  # 1-5 stars
     comment = db.Column(db.Text, nullable=True)
     parent_review_id = db.Column(db.Integer, db.ForeignKey('reviews.id'), nullable=True)
     parent_review = relationship(
@@ -684,8 +684,7 @@ class Notification(db.Model):
         """Send this notification to a specific user"""
         user_notification = UserNotification(
             user_id=user.id,
-            notification_id=self.id,
-            is_email_sent=send_email
+            notification_id=self.id
         )
         db.session.add(user_notification)
         return user_notification
@@ -696,8 +695,7 @@ class Notification(db.Model):
         for user in users:
             user_notification = UserNotification(
                 user_id=user.id,
-                notification_id=self.id,
-                is_email_sent=send_email
+                notification_id=self.id
             )
             user_notifications.append(user_notification)
             db.session.add(user_notification)
@@ -723,7 +721,6 @@ class UserNotification(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     notification_id = db.Column(db.Integer, db.ForeignKey('notifications.id'), nullable=False)
     is_read = db.Column(db.Boolean, default=False, nullable=False)
-    is_email_sent = db.Column(db.Boolean, default=False, nullable=False)
     read_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
