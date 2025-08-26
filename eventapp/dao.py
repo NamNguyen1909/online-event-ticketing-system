@@ -45,8 +45,20 @@ def get_user_payments(user_id):
     return Payment.query.filter_by(user_id=user_id).all()
 
 def get_user_notifications(user_id):
-    """Lấy thông báo của người dùng"""
+    """Lấy toàn bộ thông báo của người dùng (không phân trang, dùng cho trang profile hoặc debug)"""
     return UserNotification.query.filter_by(user_id=user_id).order_by(UserNotification.created_at.desc()).all()
+
+def get_user_notifications_paginated(user_id, offset=0, limit=10):
+    """Lấy thông báo của người dùng, phân trang (dùng cho dropdown/infinite scroll)"""
+    return UserNotification.query.filter_by(user_id=user_id).order_by(UserNotification.created_at.desc()).offset(offset).limit(limit).all()
+
+def count_unread_notifications(user_id):
+    """Đếm số lượng thông báo chưa đọc của user (dùng cho badge)"""
+    return UserNotification.query.filter_by(user_id=user_id, is_read=False).count()
+
+def get_unread_notifications(user_id, limit=5):
+    """Lấy các thông báo chưa đọc mới nhất (dùng cho dropdown nếu muốn ưu tiên unread)"""
+    return UserNotification.query.filter_by(user_id=user_id, is_read=False).order_by(UserNotification.created_at.desc()).limit(limit).all()
 
 def get_user_customer_group(user):
     """Lấy nhóm khách hàng của người dùng"""

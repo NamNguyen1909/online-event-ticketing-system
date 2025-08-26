@@ -87,7 +87,10 @@ class UpdateEventForm(CreateEventForm):
 def index():
     """Trang chủ"""
     featured_events = dao.get_featured_events()
-    return render_template('index.html', events=featured_events)
+    notifications = []
+    if current_user.is_authenticated:
+        notifications = dao.get_user_notifications(current_user.id)[:5]
+    return render_template('index.html', events=featured_events, notifications=notifications)
 
 
 @app.route('/events')
@@ -131,7 +134,10 @@ def events():
     category_title = None
     if category:
         category_title = dao.get_category_title(category)
-    return render_template('customer/EventList.html', events=events, categories=categories, category_title=category_title)
+    notifications = []
+    if current_user.is_authenticated:
+        notifications = dao.get_user_notifications(current_user.id)[:5]
+    return render_template('customer/EventList.html', events=events, categories=categories, category_title=category_title, notifications=notifications)
 
 @app.route('/event/<int:event_id>')
 def event_detail(event_id):
@@ -306,11 +312,30 @@ def my_events():
 def settings():
     return render_template('settings.html', user=current_user)
 
+
+# Trang tất cả thông báo (profile)
 @app.route('/notifications')
 @login_required
 def notifications():
     notifications = dao.get_user_notifications(current_user.id)
     return render_template('notifications.html', notifications=notifications)
+
+# API: Lấy thêm thông báo (infinite scroll/dropdown)
+@app.route('/notifications/load-more')
+@login_required
+def notifications_load_more():
+    offset = request.args.get('offset', 0, type=int)
+    limit = request.args.get('limit', 5, type=int)
+    notifications = dao.get_user_notifications_paginated(current_user.id, offset=offset, limit=limit)
+    html = render_template('notifications_dropdown.html', notifications=notifications)
+    return html
+
+# API: Đếm số lượng thông báo chưa đọc (badge)
+@app.route('/notifications/unread-count')
+@login_required
+def notifications_unread_count():
+    count = dao.count_unread_notifications(current_user.id)
+    return jsonify({'unread_count': count})
 
 @app.route('/debug/events')
 def debug_events():
@@ -1024,3 +1049,24 @@ def staff_scan_ticket():
     print(f'[DEBUG] Đã gửi notification cho user_id={ticket.user_id}', file=sys.stderr)
     print(f'Check-in thành công cho vé của {ticket.user.username}', file=sys.stderr)
     return jsonify({'success': True, 'message': f'Check-in thành công cho vé của {ticket.user.username}.'})
+
+@app.route('/notifications/mark-read/<int:noti_id>', methods=['POST'])
+@login_required
+def mark_notification_read(noti_id):
+    from eventapp.models import UserNotification
+    noti = UserNotification.query.filter_by(id=noti_id, user_id=current_user.id).first()
+    if not noti:
+        return jsonify({'success': False, 'message': 'Notification not found'}), 404
+    noti.mark_as_read()
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/notifications/mark-all-read', methods=['POST'])
+@login_required
+def mark_all_notifications_read():
+    from eventapp.models import UserNotification
+    notis = UserNotification.query.filter_by(user_id=current_user.id, is_read=False).all()
+    for n in notis:
+        n.mark_as_read()
+    db.session.commit()
+    return jsonify({'success': True})
