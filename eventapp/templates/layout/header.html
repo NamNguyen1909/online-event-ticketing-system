@@ -8,11 +8,55 @@
                 <span class="text-white">Event</span><span class="text-warning">Hub</span>
             </a>
 
-            <!-- Mobile Menu Toggle -->
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
-                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
+            <!-- Mobile Avatar Toggle -->
+            <div class="d-lg-none d-flex align-items-center ms-auto">
+                {% if current_user and current_user.is_authenticated %}
+                    <div class="dropdown">
+                        <a href="#" class="nav-link d-flex align-items-center p-0" id="mobileAvatarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <img src="{{ current_user.avatar_url or url_for('static', filename='img/default-avatar.png') }}" alt="Avatar" class="rounded-circle me-2" width="36" height="36">
+                            <span class="fw-semibold text-white small">{{ current_user.username }}</span>
+                            <i class="fas fa-chevron-down ms-2 text-white small"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="mobileAvatarDropdown">
+                            {% if current_user.role.value == 'customer' %}
+                                <li><a class="dropdown-item" href="{{ url_for('index') }}"><i class="fas fa-home me-2"></i>Trang Chủ</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('events') }}"><i class="fas fa-calendar-alt me-2"></i>Sự Kiện</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('my_tickets') }}"><i class="fas fa-ticket-alt me-2"></i>Vé Của Tôi</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a href="#" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#logoutModal">
+                                        <i class="fas fa-sign-out-alt me-2"></i>Đăng xuất
+                                    </a>
+                                </li>
+                            {% elif current_user.role.value == 'staff' %}
+                                <li><a class="dropdown-item" href="{{ url_for('events') }}"><i class="fas fa-calendar-alt me-2"></i>Sự Kiện</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('staff_scan_ticket') }}"><i class="fas fa-qrcode me-2"></i>Quét vé</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal"><i class="fas fa-sign-out-alt me-2"></i>Đăng xuất</a></li>
+                            {% elif current_user.role.value == 'organizer' %}
+                                <li><a class="dropdown-item" href="{{ url_for('events') }}"><i class="fas fa-calendar-alt me-2"></i>Sự Kiện</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('organizer_dashboard') }}"><i class="fas fa-chart-bar me-2"></i>Thống Kê</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('organizer_create_event') }}"><i class="fas fa-plus me-2"></i>Tạo Sự Kiện</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('organizer_my_events') }}"><i class="fas fa-calendar me-2"></i>Sự Kiện Của Tôi</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('organizer_manage_staff') }}"><i class="fas fa-users-cog me-2"></i>Quản Lý Nhân Viên</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('organizer_revenue_reports') }}"><i class="fas fa-money-bill-wave me-2"></i>Báo Cáo Doanh Thu</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal"><i class="fas fa-sign-out-alt me-2"></i>Đăng xuất</a></li>
+                            {% elif current_user.role.value == 'admin' %}
+                                <li><a class="dropdown-item" href="{{ url_for('admin_dashboard') }}"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal"><i class="fas fa-sign-out-alt me-2"></i>Đăng xuất</a></li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                {% else %}
+                    <a href="{{ url_for('auth.login') }}" class="nav-link d-flex align-items-center p-0">
+                        <img src="{{ url_for('static', filename='img/user-solid-full.svg') }}" alt="Avatar" class="rounded-circle me-2" width="36" height="36">
+                        <span class="fw-semibold text-white small">Khách</span>
+                        <i class="fas fa-chevron-down ms-2 text-white small"></i>
+                    </a>
+                {% endif %}
+            </div>
 
             <!-- Navigation Menu -->
             <div class="collapse navbar-collapse" id="navbarNav">
@@ -250,10 +294,10 @@
 
                     <script>
                     // Notification infinite scroll, mark as read, mark all as read, badge sync
-                    let notiOffset = 0;
-                    let notiLimit = 5;
-                    let loadingNoti = false;
-                    let allLoaded = false;
+                    // let notiOffset = 0;
+                    // let notiLimit = 5;
+                    // let loadingNoti = false;
+                    // let allLoaded = false;
                     function updateBadge() {
                         fetch('/notifications/unread-count').then(r=>r.json()).then(data=>{
                             const badge = document.getElementById('notification-badge');
