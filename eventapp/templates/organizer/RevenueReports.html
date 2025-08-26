@@ -1,7 +1,9 @@
 {% extends 'layout/base.html' %}
 {% block title %}Báo Cáo Doanh Thu - EventHub{% endblock %}
+
 {% block extra_css %}
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<!-- Tailwind CSS -->
+<link href="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -10,36 +12,63 @@
   <div class="mb-4">
     <p class="text-lg font-bold">Tổng Doanh Thu: {{ "{:,.0f} đ".format(total_revenue) }}</p>
   </div>
+
   {% if stats %}
-  <div class="overflow-x-auto">
-    <table class="w-full border-collapse">
-      <thead>
-        <tr class="bg-gray-100">
-          <th class="p-2">ID Sự Kiện</th>
-          <th class="p-2">Tiêu Đề</th>
-          <th class="p-2">Tổng Vé</th>
-          <th class="p-2">Vé Đã Bán</th>
-          <th class="p-2">Vé Còn Lại</th>
-          <th class="p-2">Doanh Thu</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for stat in stats %}
-        <tr class="border-b border-gray-200 hover:bg-gray-50">
-          <td class="p-2">{{ stat.event_id }}</td>
-          <td class="p-2">{{ stat.title }}</td>
-          <td class="p-2">{{ stat.total_tickets }}</td>
-          <td class="p-2">{{ stat.sold_tickets }}</td>
-          <td class="p-2">{{ stat.available_tickets }}</td>
-          <td class="p-2">{{ "{:,.0f} đ".format(stat.revenue) }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="bg-white shadow rounded p-4">
+    <canvas id="revenueChart" height="120"></canvas>
   </div>
   {% else %}
   <p>Không có dữ liệu doanh thu.</p>
   {% endif %}
+
   <a href="{{ url_for('organizer_my_events') }}" class="bg-gray-300 text-black px-4 py-2 rounded mt-4 inline-block">Quay Lại</a>
 </div>
+
+<!-- ✅ Chart.js chính chủ -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+
+{% if stats %}
+<script>
+  const chartLabels = {{ stats|map(attribute='title')|list|tojson }};
+  const chartData = {{ stats|map(attribute='revenue')|list|tojson }};
+
+  const ctx = document.getElementById('revenueChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: chartLabels,
+      datasets: [{
+        label: 'Doanh thu (VNĐ)',
+        data: chartData,
+        backgroundColor: 'rgba(54, 162, 235, 0.7)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return context.parsed.y.toLocaleString('vi-VN') + ' đ';
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function(value) {
+              return value.toLocaleString('vi-VN') + ' đ';
+            }
+          }
+        }
+      }
+    }
+  });
+</script>
+{% endif %}
 {% endblock %}
