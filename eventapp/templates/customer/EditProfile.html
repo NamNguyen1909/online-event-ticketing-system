@@ -1,0 +1,81 @@
+{% extends 'layout/base.html' %}
+{% block content %}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-lg rounded-4 border-0">
+                <div class="card-body p-4">
+                    <h2 class="mb-4 text-center fw-bold text-primary">
+                        <i class="fas fa-user-edit me-2"></i>Chỉnh sửa hồ sơ
+                    </h2>
+                    {% if message %}
+                        <div class="alert alert-info">{{ message }}</div>
+                    {% endif %}
+                    <form method="POST" action="/profile/edit" enctype="multipart/form-data">
+                        <div class="row mb-4 align-items-center">
+                            <div class="col-auto">
+                                <img src="{{ user.avatar_url or 'https://via.placeholder.com/80x80' }}" alt="Avatar" class="rounded-circle border border-2" width="80" height="80" id="avatarPreview">
+                            </div>
+                            <div class="col">
+                                <label for="avatar" class="form-label fw-semibold"><i class="fas fa-image me-1"></i>Ảnh đại diện mới</label>
+                                <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*" onchange="previewAvatar(event)">
+                                <small class="text-muted">Chọn ảnh mới để thay đổi</small>
+                            </div>
+                        </div>
+                        <hr>
+                        <h5 class="fw-bold mb-3 text-secondary"><i class="fas fa-id-card me-2"></i>Thông tin cá nhân</h5>
+                        <div class="mb-3 input-group">
+                            <span class="input-group-text"><i class="fas fa-user"></i></span>
+                            <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" required placeholder="Tên đăng nhập">
+                        </div>
+                        <div class="mb-3 input-group">
+                            <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                            <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required placeholder="Email">
+                        </div>
+                        <div class="mb-3 input-group">
+                            <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                            <input type="text" class="form-control" id="phone" name="phone" value="{{ user.phone or '' }}" placeholder="Số điện thoại">
+                        </div>
+                        <hr>
+                        <h5 class="fw-bold mb-3 text-secondary"><i class="fas fa-key me-2"></i>Đổi mật khẩu</h5>
+                        <div class="mb-3 input-group">
+                            <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                            <input type="password" class="form-control" id="old_password" name="old_password" placeholder="Mật khẩu hiện tại">
+                        </div>
+                        <div class="mb-3 input-group">
+                            <span class="input-group-text"><i class="fas fa-unlock"></i></span>
+                            <input type="password" class="form-control" id="new_password" name="new_password" placeholder="Mật khẩu mới">
+                        </div>
+                        <div class="mb-3 input-group">
+                            <span class="input-group-text"><i class="fas fa-check"></i></span>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" placeholder="Xác nhận mật khẩu mới">
+                        </div>
+                        <div class="mt-4 text-center">
+                            <button type="submit" class="btn btn-success px-4 py-2 fw-bold me-2">
+                                <i class="fas fa-save me-2"></i>Cập nhật hồ sơ
+                            </button>
+                            <a href="/profile" class="btn btn-outline-secondary px-4 py-2">
+                                <i class="fas fa-arrow-left me-2"></i>Quay lại hồ sơ
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function previewAvatar(event) {
+    const [file] = event.target.files;
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('avatarPreview').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+}
+</script>
+{% endblock %}

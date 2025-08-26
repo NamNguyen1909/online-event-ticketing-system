@@ -30,10 +30,10 @@
                             </a>
                         </li>
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="categoriesDropdown" role="button" 
+                            <!-- <a class="nav-link dropdown-toggle" href="#" id="categoriesDropdown" role="button" 
                                data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="fas fa-list me-1"></i>Danh Mục
-                            </a>
+                            </a> -->
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="{{ url_for('category', category='music') }}"><i class="fas fa-music me-2"></i>Âm Nhạc</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('category', category='sports') }}"><i class="fas fa-futbol me-2"></i>Thể Thao</a></li>
@@ -64,10 +64,10 @@
                             </a>
                         </li>
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="categoriesDropdown" role="button" 
+                            <!-- <a class="nav-link dropdown-toggle" href="#" id="categoriesDropdown" role="button" 
                                data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="fas fa-list me-1"></i>Danh Mục
-                            </a>
+                            </a> -->
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="{{ url_for('category', category='music') }}"><i class="fas fa-music me-2"></i>Âm Nhạc</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('category', category='sports') }}"><i class="fas fa-futbol me-2"></i>Thể Thao</a></li>
@@ -155,7 +155,6 @@
                 <!-- User Actions -->
                 <ul class="navbar-nav">
 
-
                     <!-- Notifications - Hiện cho tất cả user đã đăng nhập -->
                     {% if current_user and current_user.is_authenticated %}
                     <li class="nav-item dropdown">
@@ -210,6 +209,7 @@
                                 {% elif current_user.role.value == 'organizer' %}
                                     {#<li><a class="dropdown-item" href="{{ url_for('organizer_dashboard') }}"><i class="fas fa-chart-bar me-2"></i>Dashboard</a></li>#}
                                     <li><a class="dropdown-item" href="{{ url_for('organizer_my_events') }}"><i class="fas fa-calendar me-2"></i>Sự Kiện Của Tôi</a></li>
+                              
                                 {% elif current_user.role.value == 'staff' %}
                                     {# <li><a class="dropdown-item" href="{{ url_for('staff_scan') }}"><i class="fas fa-qrcode me-2"></i>Quét Vé</a></li> #}
                                 {% elif current_user.role.value == 'admin' %}
@@ -225,8 +225,8 @@
                         {% else %}
                             <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" 
                                role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <img src="https://via.placeholder.com/32x32/6c757d/ffffff?text=?" alt="Avatar" 
-                                     class="rounded-circle me-2" width="32" height="32">
+                          <img src="{{ url_for('static', filename='img/user-solid-full.svg') }}" alt="Avatar" 
+                              class="rounded-circle me-2" width="32" height="32">
                                 <span class="d-none d-md-inline">Khách</span>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
