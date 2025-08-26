@@ -847,28 +847,118 @@ def remove_staff_from_event(event_id):
 def admin_dashboard():
     if current_user.role.value != 'admin':
         abort(403)
-    return render_template('admin/dashboard.html')
+    # Lấy tất cả sự kiện
+    events = Event.query.options(db.joinedload(Event.ticket_types)).all()
+    # Tính tổng doanh thu
+    total_revenue = sum(e.revenue for e in events)
+    # Dữ liệu biểu đồ
+    chart_data = {
+        'labels': [e.title for e in events],
+        'revenues': [float(e.revenue) for e in events]
+    }
+    # Thống kê từng sự kiện
+    stats = []
+    for e in events:
+        stats.append({
+            'event_id': e.id,
+            'title': e.title,
+            'total_tickets': e.total_tickets,
+            'sold_tickets': e.sold_tickets,
+            'available_tickets': e.available_tickets,
+            'revenue': float(e.revenue)
+        })
+    return render_template('admin/AdminDashboard.html', total_revenue=total_revenue, chart_data=chart_data, stats=stats)
 
+
+# Route quản lý người dùng
 @app.route('/admin/users')
 @login_required
-def user_management():
+def admin_user_management():
     if current_user.role.value != 'admin':
         abort(403)
-    return render_template('admin/user_management.html')
+    users = User.query.all()
+    return render_template('admin/user_management.html', users=users)
 
+# Route kiểm duyệt sự kiện
 @app.route('/admin/events/moderation')
 @login_required
-def event_moderation():
+def admin_event_moderation():
     if current_user.role.value != 'admin':
         abort(403)
-    return render_template('admin/event_moderation.html')
+    events = Event.query.all()
+    return render_template('admin/event_moderation.html', events=events)
 
+# Route cài đặt hệ thống
 @app.route('/admin/settings')
 @login_required
-def system_settings():
+def admin_settings():
     if current_user.role.value != 'admin':
         abort(403)
     return render_template('admin/settings.html')
+
+# Sửa thông tin người dùng
+@app.route('/admin/users/edit/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+def edit_user(user_id):
+    if current_user.role.value != 'admin':
+        abort(403)
+    user = User.query.get_or_404(user_id)
+    if request.method == 'POST':
+        email = request.form.get('email')
+        role = request.form.get('role')
+        if email:
+            user.email = email
+        if role:
+            user.role = UserRole[role]
+        db.session.commit()
+        flash('Cập nhật thông tin người dùng thành công!', 'success')
+        return redirect(url_for('admin_user_management'))
+    return render_template('admin/edit_user.html', user=user)
+
+# Xóa người dùng
+@app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
+@login_required
+def delete_user(user_id):
+    if current_user.role.value != 'admin':
+        abort(403)
+    user = User.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    flash('Xóa người dùng thành công!', 'success')
+    return redirect(url_for('admin_user_management'))
+
+# Duyệt sự kiện
+@app.route('/admin/events/approve/<int:event_id>', methods=['POST'])
+@login_required
+def approve_event(event_id):
+    if current_user.role.value != 'admin':
+        abort(403)
+    event = Event.query.get_or_404(event_id)
+    event.is_active = True
+    db.session.commit()
+    flash('Sự kiện đã được duyệt!', 'success')
+    return redirect(url_for('admin_event_moderation'))
+
+# Từ chối sự kiện
+@app.route('/admin/events/reject/<int:event_id>', methods=['POST'])
+@login_required
+def reject_event(event_id):
+    if current_user.role.value != 'admin':
+        abort(403)
+    event = Event.query.get_or_404(event_id)
+    event.is_active = False
+    db.session.commit()
+    flash('Sự kiện đã bị từ chối!', 'warning')
+    return redirect(url_for('admin_event_moderation'))
+
+# Xem chi tiết sự kiện
+@app.route('/admin/events/detail/<int:event_id>')
+@login_required
+def event_detail_admin(event_id):
+    if current_user.role.value != 'admin':
+        abort(403)
+    event = Event.query.get_or_404(event_id)
+    return render_template('admin/event_detail.html', event=event)
 
 @app.route('/booking/event/<int:event_id>')
 @login_required
