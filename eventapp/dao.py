@@ -770,6 +770,13 @@ def get_staff_by_organizer(organizer_id, search_term=''):
         query = query.filter(User.username.ilike(f'%{search_term}%'))
     return query.all()
 
+def get_staff_assigned_to_event(event_id, organizer_id):
+    """Lấy sự kiện với danh sách nhân viên đã được gán, kiểm tra quyền của organizer"""
+    event = Event.query.get(event_id)
+    if not event or event.organizer_id != organizer_id:
+        return None
+    return event
+
 def get_customers_for_upgrade(search_term=''):
     """Lấy danh sách khách hàng có thể nâng cấp lên nhân viên."""
     query = User.query.filter(User.role == UserRole.customer, User.creator_id == None)
