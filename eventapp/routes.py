@@ -683,99 +683,61 @@ def organizer_revenue_reports():
         logging.error(f"Lỗi trong organizer_revenue_reports: {str(e)}")
         abort(500)
 
-@app.route('/organizer/manage-staff', methods=['GET'])
+@app.route('/organizer/manage-staff', methods=['GET', 'POST'])
 @login_required
 def organizer_manage_staff():
     """Quản lý nhân viên"""
     if current_user.role.value != 'organizer':
         abort(403)
-    staff = current_user.created_staff.all()
-    return render_template('organizer/ManageStaff.html', staff=staff)
 
-@app.route('/organizer/update-staff', methods=['POST'])
-@login_required
-def organizer_update_staff():
-    """Cập nhật vai trò nhân viên"""
-    if current_user.role.value != 'organizer':
-        abort(403)
-    try:
-        staff_id = request.form.get('staff_id')
-        role = request.form.get('role')
-        staff = User.query.get(staff_id)
-        if not staff or staff.creator_id != current_user.id:
-            flash('Nhân viên không hợp lệ', 'danger')
+    search_term = request.args.get('search', '')
+    staff = dao.get_staff_by_organizer(current_user.id, search_term)
+    customers = dao.get_customers_for_upgrade(search_term)
+    event_id = request.args.get('event_id', type=int)
+    event = None
+
+    if event_id:
+        event = Event.query.get(event_id)
+        if not event or event.organizer_id != current_user.id:
+            flash('Sự kiện không hợp lệ', 'danger')
             return redirect(url_for('organizer_manage_staff'))
-        staff.role = UserRole[role]
-        db.session.commit()
-        flash('Cập nhật vai trò thành công!', 'success')
-        return redirect(url_for('organizer_manage_staff'))
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Lỗi: {str(e)}', 'danger')
-        return redirect(url_for('organizer_manage_staff'))
 
-@app.route('/organizer/add-staff', methods=['POST'])
+    return render_template('organizer/ManageStaff.html', staff=staff, current_user=current_user, event=event, customers=customers, search_term=search_term, UserRole=UserRole)
+
+@app.route('/organizer/update-staff-role/<int:user_id>', methods=['POST'])
 @login_required
-def add_organizer_staff():
+def update_staff_role(user_id):
+    """Cập nhật vai trò nhân viên (lên hoặc xuống)"""
     if current_user.role.value != 'organizer':
-        abort(403)
+        return jsonify({'success': False, 'message': 'Không có quyền truy cập'}), 403
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'message': 'Người dùng không hợp lệ'}), 400
+
     try:
-        data = request.form
-        username = data.get('username')
-        email = data.get('email')
-        password = data.get('password')
-        phone = data.get('phone')
-        event_id = data.get('event_id')
+        data = request.get_json()
+        new_role = data.get('role')
+        if new_role not in ['customer', 'staff']:
+            return jsonify({'success': False, 'message': 'Vai trò không hợp lệ'}), 400
 
-        if not username or not email or not password:
-            return jsonify({'success': False, 'message': 'Thiếu thông tin bắt buộc'})
+        # Kiểm tra quyền sở hữu trước khi hạ cấp
+        if new_role == 'customer' and user.creator_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Bạn không có quyền hạ cấp nhân viên này'}), 403
 
-        if dao.check_user(username):
-            return jsonify({'success': False, 'message': 'Tên người dùng đã tồn tại'})
-
-        if dao.check_email(email):
-            return jsonify({'success': False, 'message': 'Email đã tồn tại'})
-
-        if not validate_email(email):
-            return jsonify({'success': False, 'message': 'Định dạng email không hợp lệ'})
-
-        is_valid, msg = validate_password(password)
-        if not is_valid:
-            return jsonify({'success': False, 'message': msg})
-
-        password_hash = generate_password_hash(password)
-        new_staff = User(
-            username=username,
-            email=email,
-            password_hash=password_hash,
-            role=UserRole.staff,
-            phone=phone,
-            creator_id=current_user.id,
-            is_active=True
-        )
-        db.session.add(new_staff)
-        db.session.flush()
-
-        if event_id:
-            event = Event.query.get(int(event_id))
-            if event and event.organizer_id == current_user.id:
-                event.staff.append(new_staff)
-            else:
-                return jsonify({'success': False, 'message': 'Không có quyền gán cho sự kiện này'})
-
-        db.session.commit()
-        return jsonify({'success': True, 'message': 'Thêm nhân viên thành công!'})
+        dao.update_user_role(user_id, new_role, current_user.id)
+        return jsonify({'success': True, 'message': f'Đã cập nhật vai trò thành {new_role}'}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/organizer/assign-staff/<int:event_id>', methods=['POST'])
 @login_required
-def assign_staff_to_event(event_id):
+def assign_staff_to_event_by_id(event_id):
     if current_user.role.value != 'organizer':
         abort(403)
     try:
-        data = request.json
+        data = request.get_json()
         staff_id = data.get('staff_id')
         if not staff_id:
             return jsonify({'success': False, 'message': 'Thiếu staff_id'})
@@ -803,7 +765,7 @@ def assign_staff_to_event(event_id):
 def get_event_staff(event_id):
     if current_user.role.value != 'organizer':
         abort(403)
-    event = Event.query.get(event_id)
+    event = Event.query.options(db.joinedload(Event.staff)).get(event_id)
     if not event or event.organizer_id != current_user.id:
         abort(404)
     staff_list = [{
@@ -815,11 +777,11 @@ def get_event_staff(event_id):
 
 @app.route('/organizer/remove-staff/<int:event_id>', methods=['POST'])
 @login_required
-def remove_staff_from_event(event_id):
+def remove_staff_from_event_by_id(event_id):
     if current_user.role.value != 'organizer':
         abort(403)
     try:
-        data = request.json
+        data = request.get_json()
         staff_id = data.get('staff_id')
         if not staff_id:
             return jsonify({'success': False, 'message': 'Thiếu staff_id'})

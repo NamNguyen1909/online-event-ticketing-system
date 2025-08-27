@@ -1,7 +1,7 @@
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from eventapp.models import (
-    User, Event, TicketType, Review, EventCategory, 
+    User, UserRole, Event, TicketType, Review, EventCategory, 
     EventTrendingLog, DiscountCode, Ticket, Payment, 
     UserNotification, CustomerGroup, PaymentMethod, Notification
 )
@@ -763,3 +763,41 @@ def create_review_reply(parent_review_id, user_id, content):
         db.session.commit()
     return reply
 
+def get_staff_by_organizer(organizer_id, search_term=''):
+    """Lấy danh sách nhân viên thuộc về organizer."""
+    query = User.query.filter(User.role == UserRole.staff, User.creator_id == organizer_id)
+    if search_term:
+        query = query.filter(User.username.ilike(f'%{search_term}%'))
+    return query.all()
+
+def get_customers_for_upgrade(search_term=''):
+    """Lấy danh sách khách hàng có thể nâng cấp lên nhân viên."""
+    query = User.query.filter(User.role == UserRole.customer, User.creator_id == None)
+    if search_term:
+        query = query.filter(User.username.ilike(f'%{search_term}%'))
+    return query.all()
+
+def update_user_role(user_id, new_role, organizer_id=None):
+    """Cập nhật vai trò của người dùng và xử lý creator_id, gỡ event."""
+    user = User.query.get(user_id)
+    if not user:
+        raise ValueError('Không tìm thấy người dùng')
+
+    if new_role not in ['customer', 'staff']:
+        raise ValueError('Vai trò không hợp lệ')
+
+    user.role = UserRole[new_role]
+
+    if new_role == 'staff':
+        # Khi nâng cấp lên staff, gán creator_id
+        user.creator_id = organizer_id
+    else:
+        # Khi hạ cấp xuống customer, xoá creator_id và gỡ khỏi event
+        user.creator_id = None
+        # Gỡ user khỏi tất cả các event mà organizer này quản lý
+        events = Event.query.filter_by(organizer_id=organizer_id).all()
+        for event in events:
+            if user in event.staff:
+                event.staff.remove(user)
+
+    db.session.commit()
