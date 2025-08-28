@@ -19,6 +19,11 @@
         box-shadow: 0 5px 20px rgba(0,0,0,0.1);
         margin-bottom: 20px;
     }
+
+    /* Hiệu ứng sao được chọn cho form đánh giá */
+    #rating-stars .star-label.active i {
+        color: #f39c12 !important;
+    }
     
     .event-title {
         color: #2c3e50;
@@ -709,11 +714,32 @@
     </div>
 
     <!-- Reviews (full width dưới cùng) -->
-    {% if reviews or stats.average_rating > 0 %}
+    {% if reviews or stats.average_rating > 0 or my_review is none %}
     <div class="row mt-4">
         <div class="col-12">
             <div class="event-info-card">
                 <h4><i class="fas fa-comments me-2"></i>Đánh giá từ khách hàng</h4>
+
+                {# Hiển thị form đánh giá cho customer đã mua vé, chưa review #}
+                {% if can_review %}
+                <div class="mb-4">
+                    <form method="POST" action="{{ url_for('add_review', event_id=event.id) }}">
+                        <div class="mb-2">
+                            <label for="rating" class="form-label">Chọn số sao:</label>
+                            <div id="rating-stars" class="mb-1">
+                                {% for i in range(1,6) %}
+                                <input type="radio" class="btn-check" name="rating" id="star{{ i }}" value="{{ i }}" autocomplete="off">
+                                <label class="btn btn-sm btn-outline-warning star-label" for="star{{ i }}" data-star="{{ i }}"><i class="fas fa-star"></i></label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <textarea name="comment" class="form-control" rows="3" placeholder="Chia sẻ cảm nhận của bạn về sự kiện..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-success"><i class="fas fa-paper-plane me-1"></i>Gửi đánh giá</button>
+                    </form>
+                </div>
+                {% endif %}
                 
                 <!-- Đánh giá trung bình - thiết kế mới -->
                 {% if stats.average_rating > 0 %}
@@ -834,9 +860,9 @@
                     
                     {% if stats.review_count > 5 %}
                     <div class="text-center">
-                        <button class="btn btn-outline-primary">
+                        <a href="{{ url_for('event_detail', event_id=event.id, all_reviews=1) }}" class="btn btn-outline-primary">
                             Xem tất cả {{ stats.review_count }} đánh giá
-                        </button>
+                        </a>
                     </div>
                     {% endif %}
                 {% else %}
@@ -864,13 +890,52 @@
 
 {% block extra_js %}
 <script>
+
 $(document).ready(function() {
-    // Xử lý chia sẻ
-    $('.btn-outline-primary, .btn-outline-info, .btn-outline-success').click(function() {
-        console.log('Sharing event...');
-        alert('Chức năng chia sẻ sẽ được triển khai trong phiên bản tiếp theo!');
+
+
+    // Hiệu ứng chọn sao cho form đánh giá
+    $('#rating-stars .star-label').on('mouseenter', function() {
+        var star = parseInt($(this).data('star'));
+        $('#rating-stars .star-label').each(function(idx) {
+            if (idx < star) {
+                $(this).addClass('active');
+            } else {
+                $(this).removeClass('active');
+            }
+        });
+    }).on('mouseleave', function() {
+        $('#rating-stars .star-label').removeClass('active');
+        var checked = $('#rating-stars input[type=radio]:checked').val();
+        if (checked) {
+            $('#rating-stars .star-label').each(function(idx) {
+                if (idx < checked) {
+                    $(this).addClass('active');
+                }
+            });
+        }
     });
+    $('#rating-stars input[type=radio]').on('change', function() {
+        var checked = $(this).val();
+        $('#rating-stars .star-label').each(function(idx) {
+            if (idx < checked) {
+                $(this).addClass('active');
+            } else {
+                $(this).removeClass('active');
+            }
+        });
+    });
+    // Khởi tạo trạng thái nếu reload
+    var checked = $('#rating-stars input[type=radio]:checked').val();
+    if (checked) {
+        $('#rating-stars .star-label').each(function(idx) {
+            if (idx < checked) {
+                $(this).addClass('active');
+            }
+        });
+    }
 });
+
 
 
 
@@ -895,18 +960,30 @@ function submitReply(reviewId) {
     {% if can_reply %}
     const textarea = document.querySelector(`#reply-form-${reviewId} textarea`);
     const content = textarea.value.trim();
-    
     if (!content) {
-        alert('Vui lòng nhập nội dung trả lời');
+        alert('Nội dung phản hồi không được để trống.');
+        textarea.focus();
         return;
     }
-    
-    // TODO: Send AJAX request to submit reply
-    console.log('Submitting reply for review', reviewId, ':', content);
-    alert('Chức năng trả lời sẽ được triển khai trong phiên bản tiếp theo!');
-    
-    // Hide form and clear content
-    toggleReplyForm(reviewId);
+    fetch(`/review/${reviewId}/reply`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({ reply_content: content })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.message || 'Có lỗi xảy ra khi gửi phản hồi.');
+        }
+    })
+    .catch(() => {
+        alert('Có lỗi xảy ra khi gửi phản hồi.');
+    });
     {% else %}
     alert('Bạn không có quyền trả lời đánh giá.');
     {% endif %}

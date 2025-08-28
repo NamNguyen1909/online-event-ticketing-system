@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, flash, redirect, url_for, render_template
+from flask import Blueprint, request, jsonify, redirect, url_for, render_template
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from eventapp import app, db
@@ -43,24 +43,19 @@ def register():
 
             # Kiểm tra dữ liệu đầu vào
             if not all([username, email, password]):
-                flash('Thiếu các trường bắt buộc (tên người dùng, email, mật khẩu)', 'danger')
                 return redirect(url_for('auth.register'))
 
             if not validate_email(email):
-                flash('Định dạng email không hợp lệ', 'danger')
                 return redirect(url_for('auth.register'))
 
             is_valid_password, password_error = validate_password(password)
             if not is_valid_password:
-                flash(password_error, 'danger')
                 return redirect(url_for('auth.register'))
 
             # Kiểm tra xem tên người dùng hoặc email đã tồn tại chưa
             if check_user(username):
-                flash('Tên người dùng đã tồn tại', 'danger')
                 return redirect(url_for('auth.register'))
             if check_email(email):
-                flash('Email đã tồn tại', 'danger')
                 return redirect(url_for('auth.register'))
 
             # Tạo người dùng mới
@@ -77,7 +72,6 @@ def register():
 
             # Đăng nhập người dùng sau khi đăng ký thành công
             login_user(user, remember=True)  # Thêm remember=True
-            flash('Đăng ký thành công! Chào mừng bạn đến với EventHub.', 'success')
             
             # Redirect về trang được yêu cầu trước đó hoặc trang chủ
             next_page = request.args.get('next')
@@ -85,7 +79,6 @@ def register():
 
         except Exception as e:
             db.session.rollback()
-            flash(f'Đã xảy ra lỗi: {str(e)}', 'danger')
             return redirect(url_for('auth.register'))
     
     return render_template('auth/register.html')
@@ -102,7 +95,6 @@ def login():
             logging.debug(f"Yêu cầu đăng nhập: username_or_email={username_or_email}")
 
             if not username_or_email or not password:
-                flash('Thiếu tên người dùng/email hoặc mật khẩu', 'danger')
                 return redirect(url_for('auth.login'))
 
             user = User.query.filter(
@@ -110,11 +102,9 @@ def login():
             ).first()
 
             if not user or not check_password_hash(user.password_hash, password):
-                flash('Thông tin đăng nhập không hợp lệ', 'danger')
                 return redirect(url_for('auth.login'))
 
             if not user.is_active:
-                flash('Tài khoản đã bị vô hiệu hóa', 'danger')
                 return redirect(url_for('auth.login'))
 
             # Set session permanent trước khi login
@@ -125,7 +115,6 @@ def login():
             login_user(user, remember=True, duration=timedelta(days=30))  # Force remember với duration
             
             logging.debug(f"Đăng nhập thành công cho user: {user.username}")
-            flash('Đăng nhập thành công!', 'success')
             
             # Redirect về trang được yêu cầu trước đó hoặc trang chủ
             next_page = request.args.get('next')
@@ -133,7 +122,6 @@ def login():
 
         except Exception as e:
             logging.error(f"Lỗi trong quá trình đăng nhập: {str(e)}")
-            flash(f'Đã xảy ra lỗi: {str(e)}', 'danger')
             return redirect(url_for('auth.login'))
     
     return render_template('auth/login.html')
@@ -143,10 +131,8 @@ def login():
 def logout():
     try:
         logout_user()
-        flash('Đăng xuất thành công', 'success')
         return redirect(url_for('index'))
     except Exception as e:
-        flash(f'Đã xảy ra lỗi: {str(e)}', 'danger')
         return redirect(url_for('index'))
 
 @auth_bp.route('/check-auth', methods=['GET'])

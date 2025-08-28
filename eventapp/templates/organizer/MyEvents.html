@@ -1,0 +1,326 @@
+{% extends 'layout/base.html' %}
+{% block title %}EventHub - Sự Kiện Của Tôi{% endblock %}
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<style>
+  .badge-active { background-color: #10B981; color: white; }
+  .badge-inactive { background-color: #EF4444; color: white; }
+  .modal { display: none; }
+  .modal.show { display: block; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4">
+  <h1 class="text-2xl font-bold mb-4">Sự Kiện Của Tôi</h1>
+
+  <!-- Hiển thị thông báo flash -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-4">
+        {% for category, message in messages %}
+          <div class="bg-{{ 'green' if category == 'success' else 'red' }}-100 text-{{ 'green' if category == 'success' else 'red' }}-800 p-2 rounded">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- Thanh thao tác -->
+  <div class="mb-4 flex justify-between">
+    <div id="action-buttons">
+      <a href="{{ url_for('organizer_create_event') }}" class="bg-blue-500 text-white px-4 py-2 rounded">Tạo Sự Kiện</a>
+      <button id="view-btn" class="bg-gray-500 text-white px-4 py-2 rounded hidden" onclick="viewEvent()">Xem</button>
+      <button id="edit-btn" class="bg-yellow-500 text-white px-4 py-2 rounded hidden" onclick="openEditModal()">Chỉnh sửa</button>
+      <button id="deactivate-btn" class="bg-red-500 text-white px-4 py-2 rounded hidden" onclick="deactivateEvents()">Ngưng hoạt động</button>
+      <a href="{{ url_for('index') }}" class="bg-gray-300 text-black px-4 py-2 rounded">Quay Lại</a>
+    </div>
+  </div>
+
+  <!-- Bảng sự kiện -->
+  {% if events.items %}
+  <div class="overflow-x-auto">
+    <table class="w-full border-collapse">
+      <thead>
+        <tr class="bg-gray-100">
+          <th class="p-2"><input type="checkbox" id="select-all" onchange="toggleSelectAll()"></th>
+          <th class="p-2">Tên sự kiện</th>
+          <th class="p-2">Thời gian</th>
+          <th class="p-2">Giá vé</th>
+          <th class="p-2">Trạng thái</th>
+          <th class="p-2">Hành động</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in events.items %}
+        <tr class="border-b border-gray-200 hover:bg-gray-50">
+          <td class="p-2"><input type="checkbox" class="event-checkbox" value="{{ event.id }}" onchange="updateActionButtons()"></td>
+          <td class="p-2">{{ event.title }}</td>
+          <td class="p-2">{{ event.start_time.strftime('%d/%m/%Y %H:%M') }} - {{ event.end_time.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td class="p-2">
+            {% if event.ticket_types %}
+              {{ event.ticket_types[0].price | format_currency }}
+            {% else %}
+              Miễn phí
+            {% endif %}
+          </td>
+          <td class="p-2">
+            <span class="badge {{ 'badge-active' if event.is_active else 'badge-inactive' }} px-2 py-1 rounded">
+              {{ 'Đang hoạt động' if event.is_active else 'Không hoạt động' }}
+            </span>
+          </td>
+          <td class="p-2">
+            <a href="{{ url_for('event_detail', event_id=event.id) }}" class="text-blue-500">Xem</a>
+            <button onclick="openEditModal('{{ event.id }}')" class="text-yellow-500 ml-2">Chỉnh sửa</button>
+            <button onclick="confirmDelete('{{ event.id }}')" class="text-red-500 ml-2">Xóa</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Phân trang -->
+  {% if events.has_prev or events.has_next %}
+  <div class="mt-4 flex justify-center">
+    {% if events.has_prev %}
+      <a href="{{ url_for('organizer_my_events', page=events.prev_num) }}" class="px-4 py-2 bg-gray-200 rounded">Trước</a>
+    {% endif %}
+    {% for page_num in events.iter_pages() %}
+      {% if page_num %}
+        <a href="{{ url_for('organizer_my_events', page=page_num) }}" class="px-4 py-2 {{ 'bg-blue-500 text-white' if page_num == events.page else 'bg-gray-200' }} rounded">{{ page_num }}</a>
+      {% else %}
+        <span class="px-4 py-2">...</span>
+      {% endif %}
+    {% endfor %}
+    {% if events.has_next %}
+      <a href="{{ url_for('organizer_my_events', page=events.next_num) }}" class="px-4 py-2 bg-gray-200 rounded">Sau</a>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="text-center">
+    <p>Chưa có sự kiện nào</p>
+    <p>Bắt đầu bằng cách tạo sự kiện mới!</p>
+    <a href="{{ url_for('organizer_create_event') }}" class="bg-blue-500 text-white px-4 py-2 rounded">Tạo Sự Kiện</a>
+  </div>
+  {% endif %}
+
+  <!-- Modal chỉnh sửa -->
+  <div id="edit-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
+    <div class="bg-white p-6 rounded-lg w-full max-w-2xl">
+      <h2 class="text-xl font-bold mb-4">Chỉnh sửa sự kiện</h2>
+      <form id="edit-event-form" method="POST" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block">Tên sự kiện</label>
+            {{ form.title(class="form-control w-full", id="edit-event-name") }}
+            {% for error in form.title.errors %}<p class="text-red-500">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label class="block">Danh mục</label>
+            {{ form.category(class="form-control w-full", id="edit-category") }}
+            {% for error in form.category.errors %}<p class="text-red-500">{{ error }}</p>{% endfor %}
+          </div>
+          <div class="col-span-2">
+            <label class="block">Mô tả</label>
+            {{ form.description(class="form-control w-full", id="edit-description") }}
+            {% for error in form.description.errors %}<p class="text-red-500">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label class="block">Địa điểm</label>
+            {{ form.location(class="form-control w-full", id="edit-location") }}
+            {% for error in form.location.errors %}<p class="text-red-500">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label class="block">Ngày bắt đầu</label>
+            {{ form.start_time(class="form-control w-full", id="edit-start-time") }}
+            {% for error in form.start_time.errors %}<p class="text-red-500">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label class="block">Ngày kết thúc</label>
+            {{ form.end_time(class="form-control w-full", id="edit-end-time") }}
+            {% for error in form.end_time.errors %}<p class="text-red-500">{{ error }}</p>{% endfor %}
+          </div>
+          <!-- Loại vé -->
+          <div class="col-span-2">
+            <label class="block">Loại vé</label>
+            <div id="ticket-types-container">
+              <!-- Các loại vé động sẽ được thêm vào đây -->
+            </div>
+            <button type="button" onclick="addTicketType()" class="bg-green-500 text-white px-2 py-1 rounded mt-2">Thêm loại vé</button>
+          </div>
+          <div>
+            <label class="block">Tải hình ảnh</label>
+            {{ form.poster(class="form-control-file", id="edit-poster") }}
+            <img id="poster-preview" class="mt-2 max-w-xs hidden" />
+            {% for error in form.poster.errors %}<p class="text-red-500">{{ error }}</p>{% endfor %}
+          </div>
+        </div>
+        <div class="mt-4 flex justify-end">
+          <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Cập nhật</button>
+          <button type="button" onclick="closeEditModal()" class="bg-gray-300 text-black px-4 py-2 rounded ml-2">Hủy</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal xác nhận xóa -->
+  <div id="delete-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
+    <div class="bg-white p-6 rounded-lg">
+      <h2 class="text-xl font-bold mb-4">Xác nhận xóa sự kiện</h2>
+      <p>Bạn có chắc chắn muốn xóa sự kiện này? Hành động này không thể hoàn tác.</p>
+      <div class="mt-4 flex justify-end">
+        <button onclick="closeDeleteModal()" class="bg-gray-300 text-black px-4 py-2 rounded">Hủy</button>
+        <button onclick="deleteEvent()" class="bg-red-500 text-white px-4 py-2 rounded ml-2">Xóa</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let selectedEventIds = [];
+  let currentEventId = null;
+
+  function toggleSelectAll() {
+    const checkboxes = document.querySelectorAll('.event-checkbox');
+    const selectAll = document.getElementById('select-all');
+    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    updateActionButtons();
+  }
+
+  function updateActionButtons() {
+    selectedEventIds = Array.from(document.querySelectorAll('.event-checkbox:checked')).map(cb => cb.value);
+    const viewBtn = document.getElementById('view-btn');
+    const editBtn = document.getElementById('edit-btn');
+    const deactivateBtn = document.getElementById('deactivate-btn');
+
+    if (selectedEventIds.length === 0) {
+      viewBtn.classList.add('hidden');
+      editBtn.classList.add('hidden');
+      deactivateBtn.classList.add('hidden');
+    } else if (selectedEventIds.length === 1) {
+      viewBtn.classList.remove('hidden');
+      editBtn.classList.remove('hidden');
+      deactivateBtn.classList.remove('hidden');
+    } else {
+      viewBtn.classList.add('hidden');
+      editBtn.classList.add('hidden');
+      deactivateBtn.classList.remove('hidden');
+      if (viewBtn.classList.contains('hidden') && editBtn.classList.contains('hidden')) {
+        alert('Không thể xem hoặc chỉnh sửa khi chọn nhiều sự kiện.');
+      }
+    }
+  }
+
+  function viewEvent() {
+    if (selectedEventIds.length === 1) {
+      window.location.href = `/event/${selectedEventIds[0]}`;
+    }
+  }
+
+  async function openEditModal(eventId) {
+    currentEventId = eventId || selectedEventIds[0];
+    try {
+      const response = await fetch(`/organizer/event/${currentEventId}`);
+      if (!response.ok) throw new Error('Không thể lấy dữ liệu sự kiện');
+      const event = await response.json();
+      document.getElementById('edit-event-name').value = event.title;
+      document.getElementById('edit-category').value = event.category;
+      document.getElementById('edit-description').value = event.description;
+      document.getElementById('edit-location').value = event.location;
+      document.getElementById('edit-start-time').value = event.start_time;
+      document.getElementById('edit-end-time').value = event.end_time;
+
+      // Điền danh sách loại vé
+      const ticketContainer = document.getElementById('ticket-types-container');
+      ticketContainer.innerHTML = '';
+      event.ticket_types.forEach(tt => addTicketType(tt.id, tt.name, tt.price, tt.total_quantity));
+
+      // Xem trước poster
+      const preview = document.getElementById('poster-preview');
+      if (event.poster_url) {
+        preview.src = event.poster_url;
+        preview.classList.remove('hidden');
+      } else {
+        preview.classList.add('hidden');
+      }
+
+      document.getElementById('edit-event-form').action = `/organizer/update-event/${currentEventId}`;
+      document.getElementById('edit-modal').classList.add('show');
+    } catch (error) {
+      alert('Lỗi khi tải dữ liệu sự kiện: ' + error.message);
+    }
+  }
+
+  function addTicketType(id = '', name = '', price = '', quantity = '') {
+    const container = document.getElementById('ticket-types-container');
+    const div = document.createElement('div');
+    div.className = 'ticket-type flex space-x-2 mb-2';
+    div.innerHTML = `
+      <input type="hidden" name="ticket_type_ids[]" value="${id}">
+      <input type="text" name="ticket_names[]" placeholder="Tên vé" value="${name}" class="form-control" required>
+      <input type="number" name="ticket_prices[]" placeholder="Giá" value="${price}" class="form-control" required min="0" step="0.01">
+      <input type="number" name="ticket_quantities[]" placeholder="Số lượng" value="${quantity}" class="form-control" required min="1">
+      <button type="button" onclick="removeTicketType(this)" class="bg-red-500 text-white px-2 py-1 rounded">Xóa</button>
+    `;
+    container.appendChild(div);
+  }
+
+  function removeTicketType(btn) {
+    if (document.querySelectorAll('.ticket-type').length > 1) {
+      btn.parentElement.remove();
+    } else {
+      alert('Phải có ít nhất một loại vé.');
+    }
+  }
+
+  function closeEditModal() {
+    document.getElementById('edit-modal').classList.remove('show');
+  }
+
+  function confirmDelete(eventId) {
+    currentEventId = eventId;
+    document.getElementById('delete-modal').classList.add('show');
+  }
+
+  function closeDeleteModal() {
+    document.getElementById('delete-modal').classList.remove('show');
+  }
+
+  async function deleteEvent() {
+    try {
+      const response = await fetch(`/organizer/delete-event/${currentEventId}`, { method: 'POST' });
+      if (!response.ok) throw new Error('Không thể xóa sự kiện');
+      window.location.reload();
+    } catch (error) {
+      alert('Lỗi khi xóa sự kiện: ' + error.message);
+    }
+  }
+
+  async function deactivateEvents() {
+    try {
+      const response = await fetch('/organizer/bulk-delete-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: selectedEventIds })
+      });
+      if (!response.ok) throw new Error('Không thể ngưng hoạt động sự kiện');
+      window.location.reload();
+    } catch (error) {
+      alert('Lỗi khi ngưng hoạt động sự kiện: ' + error.message);
+    }
+  }
+
+  document.getElementById('edit-poster').addEventListener('change', function(e) {
+    const preview = document.getElementById('poster-preview');
+    const file = e.target.files[0];
+    if (file) {
+      preview.src = URL.createObjectURL(file);
+      preview.classList.remove('hidden');
+    }
+  });
+</script>
+{% endblock %}
