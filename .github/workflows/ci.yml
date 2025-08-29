@@ -37,5 +37,6 @@ jobs:
 
       - name: Run tests
         run: |
-          PYTHONPATH=. pytest eventapp/tests -v --disable-warnings
+          # PYTHONPATH=. pytest eventapp/tests -v --disable-warnings
+          PYTHONPATH=. pytest eventapp/tests -v --disable-warnings --tb=short
           # PYTHONPATH=. pytest eventapp/tests --maxfail=1 --disable-warnings -q
