@@ -4,7 +4,7 @@ from flask import Flask
 from flask_testing import TestCase
 from flask_login import login_user, current_user
 from eventapp import app, db
-from eventapp.models import User, UserRole, Event, TicketType, EventCategory
+from eventapp.models import User, UserRole, Event, TicketType, EventCategory, Ticket
 from eventapp.dao import (
     check_user, check_email, get_event_detail, get_user_events,
     create_event_with_tickets, update_event_with_tickets, delete_event,
@@ -85,7 +85,7 @@ class EventHubTestCase(TestCase):
     def setUp(self):
         """Set up test database and environment."""
         with app.app_context():
-            db.create_all()
+            db.create_all()  # Ensure all tables (including tickets) are created
             self.client = self.app.test_client()
 
             # Create test users
@@ -139,19 +139,19 @@ class TestDAOLayer(EventHubTestCase):
     def test_check_user_success(self, mock_query):
         """Test check_user with existing username."""
         mock_user = MagicMock(id=1)
-        mock_query.filter.return_value.first.return_value = mock_user
+        mock_query.filter_by.return_value.first.return_value = mock_user
         result = check_user('customer')
         self.assertEqual(result, mock_user)
-        mock_query.filter.assert_called_once_with(User.username == 'customer')
+        mock_query.filter_by.assert_called_once_with(username='customer')
 
     @patch('eventapp.dao.User.query')
     def test_check_email_success(self, mock_query):
         """Test check_email with existing email."""
         mock_user = MagicMock(id=1)
-        mock_query.filter.return_value.first.return_value = mock_user
+        mock_query.filter_by.return_value.first.return_value = mock_user
         result = check_email('customer@example.com')
         self.assertEqual(result, mock_user)
-        mock_query.filter.assert_called_once_with(User.email == 'customer@example.com')
+        mock_query.filter_by.assert_called_once_with(email='customer@example.com')
 
     @patch('eventapp.dao.db.session.query')
     def test_get_event_detail_success(self, mock_query):
@@ -175,19 +175,16 @@ class TestDAOLayer(EventHubTestCase):
     @patch('eventapp.dao.db.session')
     def test_create_event_with_tickets_success(self, mock_db_session):
         """Test create_event_with_tickets with valid data."""
-        data = {
-            'title': 'New Event',
-            'description': 'Description',
-            'category': 'music',
-            'start_time': (datetime.utcnow() + timedelta(days=1)).isoformat(),
-            'end_time': (datetime.utcnow() + timedelta(days=2)).isoformat(),
-            'location': 'Location'
-        }
         ticket_types = [{'name': 'VIP', 'price': 100, 'total_quantity': 50}]
         event = create_event_with_tickets(
-            self.organizer.id, data['title'], data['description'],
-            EventCategory[data['category']], datetime.fromisoformat(data['start_time']),
-            datetime.fromisoformat(data['end_time']), data['location'], ticket_types
+            organizer_id=self.organizer.id,
+            ticket_types=ticket_types,
+            title='New Event',
+            description='Description',
+            category=EventCategory.music,
+            start_time=datetime.utcnow() + timedelta(days=1),
+            end_time=datetime.utcnow() + timedelta(days=2),
+            location='Location'
         )
         mock_db_session.add.assert_called()
         mock_db_session.commit.assert_called_once()
@@ -199,29 +196,37 @@ class TestDAOLayer(EventHubTestCase):
         """Test update_event_with_tickets with valid data."""
         mock_event = MagicMock(organizer_id=self.organizer.id)
         mock_query.get.return_value = mock_event
-        data = {'title': 'Updated Event'}
+        data = {
+            'title': 'Updated Event',
+            'description': 'Updated Description',
+            'category': 'music',
+            'start_time': (datetime.utcnow() + timedelta(days=1)).isoformat(),
+            'end_time': (datetime.utcnow() + timedelta(days=2)).isoformat(),
+            'location': 'Updated Location'
+        }
         ticket_types = [{'name': 'VIP', 'price': 100, 'total_quantity': 50}]
-        result = update_event_with_tickets(self.event.id, data, self.organizer.id, ticket_types)
+        result = update_event_with_tickets(self.event.id, data, ticket_types, self.organizer.id)
         self.assertEqual(result, mock_event)
         mock_query.get.assert_called_once_with(self.event.id)
 
     @patch('eventapp.dao.Event.query')
     def test_delete_event_success(self, mock_query):
         """Test delete_event with valid event."""
-        mock_event = MagicMock(organizer_id=self.organizer.id)
+        mock_event = MagicMock(organizer_id=self.organizer.id, is_active=True)
         mock_query.get.return_value = mock_event
-        result = delete_event(self.event.id, self.organizer.id)
-        self.assertTrue(result)
+        delete_event(self.event.id, self.organizer.id)
+        self.assertFalse(mock_event.is_active)
         mock_query.get.assert_called_once_with(self.event.id)
 
     @patch('eventapp.dao.Event.query')
     def test_bulk_delete_events_success(self, mock_query):
         """Test bulk_delete_events with valid events."""
-        mock_event = MagicMock(organizer_id=self.organizer.id)
-        mock_query.filter.return_value.all.return_value = [mock_event]
+        mock_event = MagicMock(organizer_id=self.organizer.id, is_active=True)
+        mock_query.filter_by.return_value.all.return_value = [mock_event]
         result = bulk_delete_events([self.event.id], self.organizer.id)
         self.assertTrue(result)
-        mock_query.filter.assert_called_once()
+        self.assertFalse(mock_event.is_active)
+        mock_query.filter_by.assert_called_once_with(organizer_id=self.organizer.id)
 
     def test_validate_ticket_types_success(self):
         """Test validate_ticket_types with valid ticket types."""
@@ -289,7 +294,7 @@ class TestRoutesIntegration(EventHubTestCase):
         """Test POST /organizer/bulk-delete-events."""
         with app.app_context():
             self.login_user('organizer', 'StrongP@ss123')
-            response = self.client.post('/organizer/bulk-delete-events', data={
+            response = self.client.post('/organizer/bulk-delete-events', json={
                 'event_ids': [self.event.id]
             }, follow_redirects=True)
             self.assertEqual(response.status_code, 200)
