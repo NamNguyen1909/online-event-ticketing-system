@@ -37,4 +37,5 @@ jobs:
 
       - name: Run tests
         run: |
-          PYTHONPATH=. pytest eventapp/tests --maxfail=1 --disable-warnings -q
+          PYTHONPATH=. pytest eventapp/tests
+          # PYTHONPATH=. pytest eventapp/tests --maxfail=1 --disable-warnings -q
