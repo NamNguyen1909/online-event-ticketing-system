@@ -29,6 +29,26 @@ app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 giờ thay vì 30 phút
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+# Flask-Admin
+from flask_admin import Admin
+from flask_admin.contrib.sqla import ModelView
+from eventapp.models import User, Event, Ticket, TicketType, DiscountCode, Payment, EventTrendingLog, Review, Notification, UserNotification, Translation
+from flask_admin.base import MenuLink
+
+admin = Admin(app, name='EventHub Admin', template_mode='bootstrap4')
+admin.add_view(ModelView(User, db.session))
+admin.add_view(ModelView(Event, db.session))
+admin.add_view(ModelView(Ticket, db.session))
+admin.add_view(ModelView(TicketType, db.session))
+admin.add_view(ModelView(DiscountCode, db.session))
+admin.add_view(ModelView(Payment, db.session))
+admin.add_view(ModelView(EventTrendingLog, db.session))
+admin.add_view(ModelView(Review, db.session))
+admin.add_view(ModelView(Notification, db.session))
+admin.add_view(ModelView(UserNotification, db.session))
+admin.add_view(ModelView(Translation, db.session))
+admin.add_link(MenuLink(name='Quay lại Admin Dashboard', url='/admin/dashboard'))
+
 # Khởi tạo Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)

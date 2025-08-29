@@ -1,4 +1,5 @@
 from eventapp import app, db, login_manager
+from eventapp.dao import update_user_role
 
 from eventapp.models import PaymentMethod, EventCategory, Review, UserRole, User, Event, Ticket, TicketType
 
@@ -7,14 +8,14 @@ from flask import flash, jsonify, render_template, request, abort, session, redi
 from flask_login import login_required, current_user
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
-from wtforms import StringField, TextAreaField, SelectField, DateTimeLocalField, FloatField, IntegerField, DecimalField
+from wtforms import StringField, TextAreaField, SelectField, DateTimeLocalField, FloatField, IntegerField, DecimalField, HiddenField
 from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError
 from datetime import datetime, timedelta
 
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Blueprint, request, jsonify, redirect
 from eventapp.auth import validate_email, validate_password
-from eventapp.dao import create_payment_url_flask, vnpay_redirect_flask,cleanup_unpaid_tickets
+from eventapp.dao import create_payment_url_flask, vnpay_redirect_flask,cleanup_unpaid_tickets, get_staff_by_organizer, get_customers_for_upgrade, get_staff_assigned_to_event
 from sqlalchemy.orm import joinedload
 import logging
 import uuid
@@ -683,99 +684,147 @@ def organizer_revenue_reports():
         logging.error(f"Lỗi trong organizer_revenue_reports: {str(e)}")
         abort(500)
 
+class RoleUpdateForm(FlaskForm):
+    """Biểu mẫu đơn giản để cung cấp CSRF token"""
+    new_role = HiddenField('new_role')
+
 @app.route('/organizer/manage-staff', methods=['GET'])
 @login_required
 def organizer_manage_staff():
-    """Quản lý nhân viên"""
     if current_user.role.value != 'organizer':
-        abort(403)
-    staff = current_user.created_staff.all()
-    return render_template('organizer/ManageStaff.html', staff=staff)
+        flash('Bạn không có quyền truy cập trang này.', 'error')
+        return redirect(url_for('index'))
 
-@app.route('/organizer/update-staff', methods=['POST'])
-@login_required
-def organizer_update_staff():
-    """Cập nhật vai trò nhân viên"""
-    if current_user.role.value != 'organizer':
-        abort(403)
-    try:
-        staff_id = request.form.get('staff_id')
-        role = request.form.get('role')
-        staff = User.query.get(staff_id)
-        if not staff or staff.creator_id != current_user.id:
-            flash('Nhân viên không hợp lệ', 'danger')
+    # Tạo biểu mẫu
+    form = RoleUpdateForm()
+
+    # Lấy tham số tìm kiếm
+    search_staff = request.args.get('search_staff', '')
+    search_customer = request.args.get('search_customer', '')
+    selected_event_id = request.args.get('event_id', type=int, default=None)
+
+    # Lấy danh sách nhân viên và khách hàng
+    staff = get_staff_by_organizer(current_user.id, search_staff)
+    customers = get_customers_for_upgrade(search_customer)
+    
+    # Lấy sự kiện (nếu được chọn)
+    event = None
+    if selected_event_id:
+        event = get_staff_assigned_to_event(selected_event_id, current_user.id)
+        if not event:
+            flash('Sự kiện không hợp lệ hoặc bạn không có quyền truy cập.', 'error')
             return redirect(url_for('organizer_manage_staff'))
-        staff.role = UserRole[role]
-        db.session.commit()
-        flash('Cập nhật vai trò thành công!', 'success')
-        return redirect(url_for('organizer_manage_staff'))
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Lỗi: {str(e)}', 'danger')
-        return redirect(url_for('organizer_manage_staff'))
 
-@app.route('/organizer/add-staff', methods=['POST'])
+    return render_template('organizer/ManageStaff.html', 
+                         form=form,
+                         staff=staff,
+                         customers=customers,
+                         event=event,
+                         UserRole=UserRole,
+                         selected_event_id=selected_event_id)
+
+@app.route('/organizer/update-staff-role/<int:user_id>', methods=['POST'])
 @login_required
-def add_organizer_staff():
+def update_staff_role(user_id):
+    """Cập nhật vai trò nhân viên (lên hoặc xuống)"""
     if current_user.role.value != 'organizer':
-        abort(403)
+        return jsonify({'success': False, 'message': 'Không có quyền truy cập'}), 403
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'message': 'Người dùng không hợp lệ'}), 400
+
     try:
-        data = request.form
-        username = data.get('username')
-        email = data.get('email')
-        password = data.get('password')
-        phone = data.get('phone')
-        event_id = data.get('event_id')
+        data = request.get_json()
+        new_role = data.get('role')
+        if new_role not in ['customer', 'staff']:
+            return jsonify({'success': False, 'message': 'Vai trò không hợp lệ'}), 400
 
-        if not username or not email or not password:
-            return jsonify({'success': False, 'message': 'Thiếu thông tin bắt buộc'})
+        # Kiểm tra quyền sở hữu trước khi hạ cấp
+        if new_role == 'customer' and user.creator_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Bạn không có quyền hạ cấp nhân viên này'}), 403
 
-        if dao.check_user(username):
-            return jsonify({'success': False, 'message': 'Tên người dùng đã tồn tại'})
-
-        if dao.check_email(email):
-            return jsonify({'success': False, 'message': 'Email đã tồn tại'})
-
-        if not validate_email(email):
-            return jsonify({'success': False, 'message': 'Định dạng email không hợp lệ'})
-
-        is_valid, msg = validate_password(password)
-        if not is_valid:
-            return jsonify({'success': False, 'message': msg})
-
-        password_hash = generate_password_hash(password)
-        new_staff = User(
-            username=username,
-            email=email,
-            password_hash=password_hash,
-            role=UserRole.staff,
-            phone=phone,
-            creator_id=current_user.id,
-            is_active=True
-        )
-        db.session.add(new_staff)
-        db.session.flush()
-
-        if event_id:
-            event = Event.query.get(int(event_id))
-            if event and event.organizer_id == current_user.id:
-                event.staff.append(new_staff)
-            else:
-                return jsonify({'success': False, 'message': 'Không có quyền gán cho sự kiện này'})
-
-        db.session.commit()
-        return jsonify({'success': True, 'message': 'Thêm nhân viên thành công!'})
+        dao.update_user_role(user_id, new_role, current_user.id)
+        return jsonify({'success': True, 'message': f'Đã cập nhật vai trò thành {new_role}'}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/organizer/update_role/<int:user_id>', methods=['POST'])
+@login_required
+def organizer_update_role(user_id):
+    if current_user.role.value != 'organizer':
+        flash('Bạn không có quyền thực hiện hành động này.', 'error')
+        return redirect(url_for('index'))
+    
+    form = RoleUpdateForm()
+    if form.validate_on_submit():
+        try:
+            new_role = form.new_role.data
+            update_user_role(user_id, new_role, current_user.id)
+            flash(f'Đã {"nâng cấp" if new_role == "staff" else "hạ cấp"} người dùng thành công.', 'success')
+        except ValueError as e:
+            flash(str(e), 'error')
+        except Exception as e:
+            flash('Đã xảy ra lỗi khi cập nhật vai trò.', 'error')
+            print(f"Error in organizer_update_role: {str(e)}")
+    else:
+        flash('Yêu cầu không hợp lệ.', 'error')
+    
+    return redirect(url_for('organizer_manage_staff'))
 
 @app.route('/organizer/assign-staff/<int:event_id>', methods=['POST'])
 @login_required
-def assign_staff_to_event(event_id):
+def organizer_assign_staff(event_id):
+    if current_user.role.value != 'organizer':
+        flash('Bạn không có quyền thực hiện hành động này.', 'error')
+        return redirect(url_for('index'))
+
+    event = Event.query.get_or_404(event_id)
+    if event.organizer_id != current_user.id:
+        flash('Bạn không có quyền quản lý sự kiện này.', 'error')
+        return redirect(url_for('organizer_manage_staff'))
+
+    form = RoleUpdateForm()
+    if form.validate_on_submit():
+        staff_id = request.form.get('staff_id', type=int)
+        action = request.form.get('action')
+
+        if not staff_id:
+            flash('Vui lòng chọn nhân viên.', 'error')
+            return redirect(url_for('organizer_manage_staff', event_id=event_id))
+
+        staff = User.query.get_or_404(staff_id)
+        if staff.role.value != 'staff' or staff.creator_id != current_user.id:
+            flash('Người dùng không phải nhân viên hợp lệ.', 'error')
+            return redirect(url_for('organizer_manage_staff', event_id=event_id))
+
+        if action == 'assign':
+            if staff not in event.staff:
+                event.staff.append(staff)
+                flash(f'Đã gán nhân viên {staff.username} cho sự kiện.', 'success')
+            else:
+                flash(f'Nhân viên {staff.username} đã được gán cho sự kiện.', 'warning')
+        elif action == 'remove':
+            if staff in event.staff:
+                event.staff.remove(staff)
+                flash(f'Đã gỡ nhân viên {staff.username} khỏi sự kiện.', 'success')
+            else:
+                flash(f'Nhân viên {staff.username} không có trong sự kiện.', 'warning')
+
+        db.session.commit()
+    else:
+        flash('Yêu cầu không hợp lệ.', 'error')
+
+    return redirect(url_for('organizer_manage_staff', event_id=event_id))
+
+@app.route('/organizer/assign-staff/<int:event_id>', methods=['POST'])
+@login_required
+def assign_staff_to_event_by_id(event_id):
     if current_user.role.value != 'organizer':
         abort(403)
     try:
-        data = request.json
+        data = request.get_json()
         staff_id = data.get('staff_id')
         if not staff_id:
             return jsonify({'success': False, 'message': 'Thiếu staff_id'})
@@ -803,7 +852,7 @@ def assign_staff_to_event(event_id):
 def get_event_staff(event_id):
     if current_user.role.value != 'organizer':
         abort(403)
-    event = Event.query.get(event_id)
+    event = Event.query.options(db.joinedload(Event.staff)).get(event_id)
     if not event or event.organizer_id != current_user.id:
         abort(404)
     staff_list = [{
@@ -815,11 +864,11 @@ def get_event_staff(event_id):
 
 @app.route('/organizer/remove-staff/<int:event_id>', methods=['POST'])
 @login_required
-def remove_staff_from_event(event_id):
+def remove_staff_from_event_by_id(event_id):
     if current_user.role.value != 'organizer':
         abort(403)
     try:
-        data = request.json
+        data = request.get_json()
         staff_id = data.get('staff_id')
         if not staff_id:
             return jsonify({'success': False, 'message': 'Thiếu staff_id'})
@@ -842,33 +891,142 @@ def remove_staff_from_event(event_id):
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)})
 
+@app.route('/organizer/event/<int:event_id>/assigned-staff', methods=['GET'])
+@login_required
+def get_assigned_staff(event_id):
+    """Lấy danh sách nhân viên đã được gán cho sự kiện"""
+    if current_user.role.value != 'organizer':
+        abort(403)
+    
+    event = Event.query.get(event_id)
+    if not event or event.organizer_id != current_user.id:
+        return jsonify({'success': False, 'message': 'Sự kiện không tồn tại hoặc không thuộc quyền quản lý'}), 404
+    
+    staff_list = [{
+        'id': s.id,
+        'username': s.username,
+        'email': s.email
+    } for s in event.staff]
+    
+    return jsonify({'success': True, 'staff': staff_list})
+
 @app.route('/admin/dashboard')
 @login_required
 def admin_dashboard():
     if current_user.role.value != 'admin':
         abort(403)
-    return render_template('admin/dashboard.html')
+    # Lấy tất cả sự kiện
+    events = Event.query.options(db.joinedload(Event.ticket_types)).all()
+    # Tính tổng doanh thu
+    total_revenue = sum(e.revenue for e in events)
+    # Dữ liệu biểu đồ
+    chart_data = {
+        'labels': [e.title for e in events],
+        'revenues': [float(e.revenue) for e in events]
+    }
+    # Thống kê từng sự kiện
+    stats = []
+    for e in events:
+        stats.append({
+            'event_id': e.id,
+            'title': e.title,
+            'total_tickets': e.total_tickets,
+            'sold_tickets': e.sold_tickets,
+            'available_tickets': e.available_tickets,
+            'revenue': float(e.revenue)
+        })
+    return render_template('admin/AdminDashboard.html', total_revenue=total_revenue, chart_data=chart_data, stats=stats)
 
+
+# Route quản lý người dùng
 @app.route('/admin/users')
 @login_required
-def user_management():
+def admin_user_management():
     if current_user.role.value != 'admin':
         abort(403)
-    return render_template('admin/user_management.html')
+    users = User.query.all()
+    return render_template('admin/user_management.html', users=users)
 
+# Route kiểm duyệt sự kiện
 @app.route('/admin/events/moderation')
 @login_required
-def event_moderation():
+def admin_event_moderation():
     if current_user.role.value != 'admin':
         abort(403)
-    return render_template('admin/event_moderation.html')
+    events = Event.query.all()
+    return render_template('admin/event_moderation.html', events=events)
 
+# Route cài đặt hệ thống
 @app.route('/admin/settings')
 @login_required
-def system_settings():
+def admin_settings():
     if current_user.role.value != 'admin':
         abort(403)
     return render_template('admin/settings.html')
+
+# Sửa thông tin người dùng
+@app.route('/admin/users/edit/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+def edit_user(user_id):
+    if current_user.role.value != 'admin':
+        abort(403)
+    user = User.query.get_or_404(user_id)
+    if request.method == 'POST':
+        email = request.form.get('email')
+        role = request.form.get('role')
+        if email:
+            user.email = email
+        if role:
+            user.role = UserRole[role]
+        db.session.commit()
+        flash('Cập nhật thông tin người dùng thành công!', 'success')
+        return redirect(url_for('admin_user_management'))
+    return render_template('admin/edit_user.html', user=user)
+
+# Xóa người dùng
+@app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
+@login_required
+def delete_user(user_id):
+    if current_user.role.value != 'admin':
+        abort(403)
+    user = User.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    flash('Xóa người dùng thành công!', 'success')
+    return redirect(url_for('admin_user_management'))
+
+# Duyệt sự kiện
+@app.route('/admin/events/approve/<int:event_id>', methods=['POST'])
+@login_required
+def approve_event(event_id):
+    if current_user.role.value != 'admin':
+        abort(403)
+    event = Event.query.get_or_404(event_id)
+    event.is_active = True
+    db.session.commit()
+    flash('Sự kiện đã được duyệt!', 'success')
+    return redirect(url_for('admin_event_moderation'))
+
+# Từ chối sự kiện
+@app.route('/admin/events/reject/<int:event_id>', methods=['POST'])
+@login_required
+def reject_event(event_id):
+    if current_user.role.value != 'admin':
+        abort(403)
+    event = Event.query.get_or_404(event_id)
+    event.is_active = False
+    db.session.commit()
+    flash('Sự kiện đã bị từ chối!', 'warning')
+    return redirect(url_for('admin_event_moderation'))
+
+# Xem chi tiết sự kiện
+@app.route('/admin/events/detail/<int:event_id>')
+@login_required
+def event_detail_admin(event_id):
+    if current_user.role.value != 'admin':
+        abort(403)
+    event = Event.query.get_or_404(event_id)
+    return render_template('admin/event_detail.html', event=event)
 
 @app.route('/booking/event/<int:event_id>')
 @login_required

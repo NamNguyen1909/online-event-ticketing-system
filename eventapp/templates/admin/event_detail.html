@@ -1,0 +1,17 @@
+{% extends 'layout/base.html' %}
+{% block title %}Chi Tiết Sự Kiện{% endblock %}
+{% block content %}
+<div class="container">
+    <h1>Chi Tiết Sự Kiện</h1>
+    <ul class="list-group">
+        <li class="list-group-item"><strong>ID:</strong> {{ event.id }}</li>
+        <li class="list-group-item"><strong>Tên sự kiện:</strong> {{ event.title }}</li>
+        <li class="list-group-item"><strong>Mô tả:</strong> {{ event.description }}</li>
+        <li class="list-group-item"><strong>Thời gian bắt đầu:</strong> {{ event.start_time }}</li>
+        <li class="list-group-item"><strong>Thời gian kết thúc:</strong> {{ event.end_time }}</li>
+        <li class="list-group-item"><strong>Địa điểm:</strong> {{ event.location }}</li>
+        <li class="list-group-item"><strong>Trạng thái:</strong> {{ 'Đang hoạt động' if event.is_active else 'Bị từ chối' }}</li>
+    </ul>
+    <a href="{{ url_for('admin_event_moderation') }}" class="btn btn-secondary mt-3">Quay lại</a>
+</div>
+{% endblock %}

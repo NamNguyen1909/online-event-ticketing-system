@@ -1,114 +1,213 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quản Lý Nhân Viên - EventHub</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    {% extends 'layout/base.html' %}
-    {% block title %}Quản Lý Nhân Viên - EventHub{% endblock %}
-    {% block content %}
-    <div class="container">
-        <h1>Quản Lý Nhân Viên</h1>
-        <ul class="nav nav-tabs mb-3">
-            <li class="nav-item">
-                <a class="nav-link active" id="list-tab" data-bs-toggle="tab" href="#list">Danh Sách Nhân Viên</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" id="add-tab" data-bs-toggle="tab" href="#add">Thêm Nhân Viên</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" id="edit-tab" data-bs-toggle="tab" href="#edit">Chỉnh Sửa Nhân Viên</a>
-            </li>
-        </ul>
-        <div class="tab-content">
-            <div class="tab-pane fade show active" id="list">
-                {% if staff %}
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Tên Người Dùng</th>
-                            <th>Email</th>
-                            <th>Số Điện Thoại</th>
-                            <th>Ngày Tạo</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for s in staff %}
-                        <tr>
-                            <td>{{ s.id }}</td>
-                            <td>{{ s.username }}</td>
-                            <td>{{ s.email }}</td>
-                            <td>{{ s.phone or 'N/A' }}</td>
-                            <td>{{ s.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <p>Không tìm thấy nhân viên nào.</p>
-                {% endif %}
-                <a href="{{ url_for('organizer_my_events') }}" class="btn btn-secondary">Thoát</a>
+{% extends 'layout/base.html' %}
+{% block title %}Quản Lý Nhân Viên - EventHub{% endblock %}
+{% block content %}
+    <div class="container my-5">
+        <h2 class="mb-4 text-center text-primary fw-bold">
+            <i class="fas fa-users-cog me-2"></i> Quản Lý Nhân Viên
+        </h2>
+        <p class="text-center text-muted mb-5">
+            Quản lý vai trò nhân viên và gán nhân viên cho các sự kiện
+        </p>
+
+        <div class="card shadow-sm">
+            <div class="card-header p-0">
+                <ul class="nav nav-tabs" id="myTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="upgrade-tab" data-bs-toggle="tab" data-bs-target="#upgrade-pane" type="button" role="tab" aria-controls="upgrade-pane" aria-selected="true">
+                            <i class="fas fa-user-plus me-2"></i> Nâng cấp người dùng
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="staff-tab" data-bs-toggle="tab" data-bs-target="#staff-pane" type="button" role="tab" aria-controls="staff-pane" aria-selected="false">
+                            <i class="fas fa-user-friends me-2"></i> Nhân viên hiện tại
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="assign-tab" data-bs-toggle="tab" data-bs-target="#assign-pane" type="button" role="tab" aria-controls="assign-pane" aria-selected="false">
+                            <i class="fas fa-calendar-check me-2"></i> Gán cho sự kiện
+                        </button>
+                    </li>
+                </ul>
             </div>
-            <div class="tab-pane fade" id="add">
-                <form method="post" action="{{ url_for('add_organizer_staff') }}">
-                    <div class="mb-3">
-                        <label class="form-label">Tên Người Dùng</label>
-                        <input type="text" name="username" class="form-control" required>
+            <div class="card-body">
+                <div class="tab-content" id="myTabContent">
+                    <div class="tab-pane fade show active" id="upgrade-pane" role="tabpanel" aria-labelledby="upgrade-tab">
+                        <h4 class="mb-3">Tìm và nâng cấp người dùng</h4>
+                        <form class="mb-4" method="GET" action="{{ url_for('organizer_manage_staff') }}">
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="search_customer" placeholder="Tìm kiếm người dùng theo tên hoặc email" value="{{ request.args.get('search_customer', '') }}">
+                                <button class="btn btn-primary" type="submit">
+                                    <i class="fas fa-search me-1"></i> Tìm
+                                </button>
+                            </div>
+                        </form>
+
+                        {% if customers and customers|length > 0 %}
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Tên Người Dùng</th>
+                                            <th>Email</th>
+                                            <th>Vai trò</th>
+                                            <th>Hành động</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for customer in customers %}
+                                            <tr>
+                                                <td>{{ customer.id }}</td>
+                                                <td>{{ customer.username }}</td>
+                                                <td>{{ customer.email }}</td>
+                                                <td><span class="badge bg-secondary">{{ customer.role.value }}</span></td>
+                                                <td>
+                                                    <form method="POST" action="{{ url_for('organizer_update_role', user_id=customer.id) }}">
+                                                        {{ form.csrf_token }}
+                                                        <input type="hidden" name="new_role" value="staff">
+                                                        <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Bạn có chắc chắn muốn nâng cấp người dùng này lên nhân viên?')">
+                                                            <i class="fas fa-arrow-up me-1"></i> Nâng cấp
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="alert alert-info text-center">
+                                <i class="fas fa-info-circle me-2"></i> Không có người dùng nào để nâng cấp.
+                            </p>
+                        {% endif %}
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Email</label>
-                        <input type="email" name="email" class="form-control" required>
+
+                    <div class="tab-pane fade" id="staff-pane" role="tabpanel" aria-labelledby="staff-tab">
+                        <h4 class="mb-3">Danh sách nhân viên</h4>
+                        <form class="mb-4" method="GET" action="{{ url_for('organizer_manage_staff') }}">
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="search_staff" placeholder="Tìm kiếm nhân viên theo tên hoặc email" value="{{ request.args.get('search_staff', '') }}">
+                                <button class="btn btn-primary" type="submit">
+                                    <i class="fas fa-search me-1"></i> Tìm
+                                </button>
+                            </div>
+                        </form>
+
+                        {% if staff and staff|length > 0 %}
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Tên Người Dùng</th>
+                                            <th>Email</th>
+                                            <th>Vai trò</th>
+                                            <th>Hành động</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for s in staff %}
+                                            <tr>
+                                                <td>{{ s.id }}</td>
+                                                <td>{{ s.username }}</td>
+                                                <td>{{ s.email }}</td>
+                                                <td><span class="badge bg-success">{{ s.role.value }}</span></td>
+                                                <td>
+                                                    {% if s.role == UserRole.staff %}
+                                                        <form method="POST" action="{{ url_for('organizer_update_role', user_id=s.id) }}">
+                                                            {{ form.csrf_token }}
+                                                            <input type="hidden" name="new_role" value="customer">
+                                                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Bạn có chắc chắn muốn hạ cấp nhân viên này xuống khách hàng?')">
+                                                                <i class="fas fa-arrow-down me-1"></i> Hạ cấp
+                                                            </button>
+                                                        </form>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="alert alert-warning text-center">
+                                <i class="fas fa-exclamation-triangle me-2"></i> Không tìm thấy nhân viên nào.
+                            </p>
+                        {% endif %}
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Mật Khẩu</label>
-                        <input type="password" name="password" class="form-control" required>
+
+                    <div class="tab-pane fade" id="assign-pane" role="tabpanel" aria-labelledby="assign-tab">
+                        <h4 class="mb-3">Gán nhân viên cho sự kiện</h4>
+                        <form method="GET" action="{{ url_for('organizer_manage_staff') }}" class="mb-4">
+                            <div class="mb-3">
+                                <label for="event_select" class="form-label fw-bold">Chọn Sự Kiện</label>
+                                <select name="event_id" id="event_select" class="form-select" onchange="this.form.submit()">
+                                    <option value="">-- Chọn một sự kiện --</option>
+                                    {% for event in current_user.organized_events %}
+                                        <option value="{{ event.id }}" {% if selected_event_id == event.id %}selected{% endif %}>{{ event.title }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </form>
+
+                        {% if event %}
+                            <h5 class="mb-3">
+                                <i class="fas fa-clipboard-list me-2"></i> Nhân viên hiện tại của sự kiện "<span class="text-primary">{{ event.title }}</span>"
+                            </h5>
+                            <div class="table-responsive mb-4">
+                                <table class="table table-striped table-hover">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Tên Người Dùng</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for s in event.staff %}
+                                            <tr>
+                                                <td>{{ s.username }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                        {% if not event.staff %}
+                                            <tr>
+                                                <td class="text-muted fst-italic">Chưa có nhân viên nào được gán cho sự kiện này.</td>
+                                            </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <form method="POST" action="{{ url_for('organizer_assign_staff', event_id=event.id) }}">
+                                {{ form.csrf_token }}
+                                <div class="mb-3">
+                                    <label for="staff_select" class="form-label fw-bold">Chọn nhân viên để Gán/Gỡ</label>
+                                    <select name="staff_id" id="staff_select" class="form-select">
+                                        <option value="">-- Chọn nhân viên --</option>
+                                        {% for s in staff %}
+                                            <option value="{{ s.id }}">{{ s.username }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" name="action" value="assign" class="btn btn-primary">
+                                        <i class="fas fa-user-plus me-1"></i> Gán
+                                    </button>
+                                    <button type="submit" name="action" value="remove" class="btn btn-danger">
+                                        <i class="fas fa-user-minus me-1"></i> Gỡ
+                                    </button>
+                                </div>
+                            </form>
+                        {% else %}
+                            <p class="alert alert-info text-center">
+                                <i class="fas fa-info-circle me-2"></i> Vui lòng chọn sự kiện từ danh sách để gán nhân viên.
+                            </p>
+                        {% endif %}
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Số Điện Thoại</label>
-                        <input type="text" name="phone" class="form-control">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Sự Kiện (Tùy Chọn)</label>
-                        <select name="event_id" class="form-control">
-                            <option value="">Không gán</option>
-                            {% for event in current_user.organized_events %}
-                            <option value="{{ event.id }}">{{ event.title }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Thêm</button>
-                    <a href="{{ url_for('organizer_my_events') }}" class="btn btn-secondary">Thoát</a>
-                </form>
-            </div>
-            <div class="tab-pane fade" id="edit">
-                <form method="post" action="{{ url_for('organizer_update_staff') }}">
-                    <div class="mb-3">
-                        <label class="form-label">Chọn Nhân Viên</label>
-                        <select name="staff_id" class="form-control" required>
-                            <option value="">Chọn nhân viên</option>
-                            {% for s in staff %}
-                            <option value="{{ s.id }}">{{ s.username }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Vai Trò</label>
-                        <select name="role" class="form-control" required>
-                            <option value="staff">Nhân Viên</option>
-                            <option value="organizer">Người Tổ Chức</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Cập Nhật</button>
-                    <a href="{{ url_for('organizer_my_events') }}" class="btn btn-secondary">Thoát</a>
-                </form>
+                </div>
             </div>
         </div>
+        <div class="text-center mt-5">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary btn-lg">
+                <i class="fas fa-home me-2"></i> Quay lại trang chủ
+            </a>
+        </div>
     </div>
-    {% endblock %}
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+{% endblock %}
