@@ -11,6 +11,7 @@ services:
     buildCommand: |
       cd eventapp
       pip install -r requirements.txt
+      flask db migrate
       flask db stamp head
       flask db upgrade
       cd ..
