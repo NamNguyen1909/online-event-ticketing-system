@@ -78,26 +78,21 @@ class TestEventDetailTicketSelection(unittest.TestCase):
         self.assertTrue(b'dat ve' in response.data.lower() or b'book ticket' in response.data.lower() or b'btn-book-ticket' in response.data)
 
     def test_book_ticket_post(self):
-        """Giả lập gửi POST đặt vé, luôn đảm bảo user đã đăng nhập để test logic chọn vé."""
-        from flask_login import login_user
+        """Giả lập gửi POST đặt vé, đảm bảo user đã đăng nhập qua session."""
         data = {
             'event_id': self.event_id,
             'ticket_type_id': self.ticket_type_id,
             'quantity': 1
         }
+        with self.app.session_transaction() as sess:
+            sess['user_id'] = self.user_id
+        response = self.app.post('/booking/process', data=data, follow_redirects=False)
+        self.assertIn(response.status_code, [200, 400])
         with app.app_context():
-            user = User.query.get(self.user_id)
-            login_user(user)
-            # Flask-Login sẽ set current_user, test client sẽ nhận diện là đã login
-            response = self.app.post('/booking/process', data=data, follow_redirects=False)
-            self.assertIn(response.status_code, [200, 400])
-            # Kiểm tra số lượng vé đã tăng
             ticket_type = TicketType.query.get(self.ticket_type_id)
             self.assertGreaterEqual(ticket_type.sold_quantity, 0)
-            # Kiểm tra ticket đã được tạo cho user này
             ticket = Ticket.query.filter_by(user_id=self.user_id, event_id=self.event_id, ticket_type_id=self.ticket_type_id).order_by(Ticket.id.desc()).first()
             self.assertIsNotNone(ticket)
-            # Có thể kiểm tra thêm nội dung response nếu cần
 
     def tearDown(self):
         with app.app_context():
