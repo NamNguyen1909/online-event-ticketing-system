@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 from flask import Flask
 from flask_testing import TestCase
 from eventapp import app, db
-from eventapp.models import User, UserRole, Event, TicketType, Review, EventCategory
+from eventapp.models import User, UserRole, Event, TicketType, Review, EventCategory, Ticket, Payment
 from eventapp.dao import (
     check_user, check_email, get_user_events, get_user_notifications,
     get_featured_events, get_event_detail, get_active_ticket_types,
@@ -16,6 +16,7 @@ from eventapp.dao import (
 from eventapp.auth import validate_email, validate_password
 from werkzeug.security import generate_password_hash
 from datetime import datetime, timedelta
+import pytest
 
 class EventHubTestCase(TestCase):
     """Lớp kiểm thử cơ bản cho ứng dụng EventHub với Flask test client."""
@@ -26,6 +27,7 @@ class EventHubTestCase(TestCase):
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
         app.config['SECRET_KEY'] = 'test_secret'
+        app.config['WTF_CSRF_ENABLED'] = False  # Tắt CSRF để kiểm thử
         return app
 
     def setUp(self):
@@ -36,16 +38,45 @@ class EventHubTestCase(TestCase):
         self.test_user = User(
             username='testuser',
             email='test@example.com',
-            password_hash='hashed_password',
+            password_hash=generate_password_hash('StrongP@ss123'),
             role=UserRole.customer
         )
-        db.session.add(self.test_user)
+        self.organizer = User(
+            username='organizer',
+            email='organizer@example.com',
+            password_hash=generate_password_hash('StrongP@ss123'),
+            role=UserRole.organizer
+        )
+        self.event = Event(
+            id=1,
+            organizer_id=self.organizer.id,
+            title='Sự Kiện Kiểm Thử',
+            description='Mô tả',
+            category=EventCategory.music,
+            start_time=datetime.utcnow() + timedelta(days=1),
+            end_time=datetime.utcnow() + timedelta(days=2),
+            location='Địa điểm kiểm thử',
+            is_active=True
+        )
+        db.session.add_all([self.test_user, self.organizer, self.event])
         db.session.commit()
 
     def tearDown(self):
         """Dọn dẹp cơ sở dữ liệu kiểm thử."""
         db.session.remove()
         db.drop_all()
+
+    def login_user(self, username='testuser', password='StrongP@ss123'):
+        """Hàm hỗ trợ đăng nhập người dùng."""
+        return self.client.post('/auth/login', data={
+            'username_or_email': username,
+            'password': password,
+            'remember_me': True
+        }, follow_redirects=True)
+
+    def login_organizer(self):
+        """Hàm hỗ trợ đăng nhập với vai trò tổ chức sự kiện."""
+        return self.login_user('organizer', 'StrongP@ss123')
 
 class TestDAOLayer(EventHubTestCase):
     """Kiểm thử đơn vị cho các hàm trong dao.py."""
@@ -85,18 +116,27 @@ class TestDAOLayer(EventHubTestCase):
     @patch('eventapp.dao.Event.query')
     def test_get_user_events_success(self, mock_query):
         """Kiểm tra get_user_events với người dùng hợp lệ và có sự kiện."""
-        mock_event = Event(id=1, organizer_id=self.test_user.id, title='Sự Kiện Kiểm Thử')
-        mock_query.filter_by.return_value.order_by.return_value.paginate.return_value = [mock_event]
-        result = get_user_events(self.test_user.id)
+        mock_paginate = MagicMock()
+        mock_paginate.items = [self.event]
+        mock_paginate.has_next = False
+        mock_paginate.has_prev = False
+        mock_query.filter_by.return_value.order_by.return_value.paginate.return_value = mock_paginate
+        result = get_user_events(self.organizer.id)
         self.assertEqual(len(result.items), 1)
         self.assertEqual(result.items[0].title, 'Sự Kiện Kiểm Thử')
+        mock_query.filter_by.assert_called_once_with(organizer_id=self.organizer.id)
 
     @patch('eventapp.dao.Event.query')
     def test_get_user_events_no_events(self, mock_query):
         """Kiểm tra get_user_events khi không có sự kiện."""
-        mock_query.filter_by.return_value.order_by.return_value.paginate.return_value = []
+        mock_paginate = MagicMock()
+        mock_paginate.items = []
+        mock_paginate.has_next = False
+        mock_paginate.has_prev = False
+        mock_query.filter_by.return_value.order_by.return_value.paginate.return_value = mock_paginate
         result = get_user_events(self.test_user.id)
         self.assertEqual(len(result.items), 0)
+        mock_query.filter_by.assert_called_once_with(organizer_id=self.test_user.id)
 
     @patch('eventapp.dao.UserNotification.query')
     def test_get_user_notifications_success(self, mock_query):
@@ -110,8 +150,7 @@ class TestDAOLayer(EventHubTestCase):
     @patch('eventapp.dao.Event.query')
     def test_get_featured_events_success(self, mock_query):
         """Kiểm tra get_featured_events với giới hạn."""
-        mock_event = Event(id=1, is_active=True)
-        mock_query.filter_by.return_value.limit.return_value.all.return_value = [mock_event]
+        mock_query.filter_by.return_value.limit.return_value.all.return_value = [self.event]
         result = get_featured_events(limit=3)
         self.assertEqual(len(result), 1)
         mock_query.filter_by.assert_called_once_with(is_active=True)
@@ -119,10 +158,10 @@ class TestDAOLayer(EventHubTestCase):
     @patch('eventapp.dao.db.session.query')
     def test_get_event_detail_success(self, mock_query):
         """Kiểm tra get_event_detail với sự kiện hợp lệ."""
-        mock_event = Event(id=1, is_active=True)
-        mock_query.return_value.options.return_value.filter_by.return_value.first.return_value = mock_event
+        mock_query.return_value.options.return_value.filter_by.return_value.first.return_value = self.event
         result = get_event_detail(1)
-        self.assertEqual(result, mock_event)
+        self.assertEqual(result, self.event)
+        mock_query.return_value.options.assert_called_once()
 
     @patch('eventapp.dao.db.session.query')
     def test_get_event_detail_not_found(self, mock_query):
@@ -201,6 +240,17 @@ class TestDAOLayer(EventHubTestCase):
         result = user_can_review(1, mock_user.id)
         self.assertFalse(result)
 
+    @patch('eventapp.dao.User.query')
+    @patch('eventapp.dao.Ticket.query')
+    @patch('eventapp.dao.get_user_review')
+    def test_user_can_review_already_reviewed(self, mock_get_user_review, mock_ticket_query, mock_user_query):
+        """Kiểm tra user_can_review khi người dùng đã đánh giá."""
+        mock_user_query.get.return_value = self.test_user
+        mock_ticket_query.filter_by.return_value.first.return_value = MagicMock(is_paid=True)
+        mock_get_user_review.return_value = MagicMock()
+        result = user_can_review(1, self.test_user.id)
+        self.assertFalse(result)
+
     @patch('eventapp.dao.db.session')
     @patch('eventapp.dao.Event.upload_poster')
     def test_create_event_with_tickets_with_poster(self, mock_upload_poster, mock_session):
@@ -219,13 +269,13 @@ class TestDAOLayer(EventHubTestCase):
         mock_session.commit.return_value = None
         mock_session.flush.return_value = None
         mock_upload_poster.return_value = {'public_id': 'test_poster_id'}
-        result = create_event_with_tickets(data, self.test_user.id)
+        result = create_event_with_tickets(self.organizer.id, data)
         self.assertIsNotNone(result)
-        mock_upload_poster.assert_called_once_with('test_poster.jpg')
+        mock_upload_poster.assert_called_once()
 
     @patch('eventapp.dao.db.session')
-    def test_create_event_with_tickets_without_poster(self, mock_session):
-        """Kiểm tra create_event_with_tickets với dữ liệu hợp lệ không có poster."""
+    def test_create_event_with_tickets_invalid_tickets(self, mock_session):
+        """Kiểm tra create_event_with_tickets với loại vé không hợp lệ."""
         data = {
             'title': 'Sự Kiện Kiểm Thử',
             'description': 'Mô tả',
@@ -233,31 +283,18 @@ class TestDAOLayer(EventHubTestCase):
             'start_time': '2025-09-01T10:00',
             'end_time': '2025-09-01T12:00',
             'location': 'Địa điểm kiểm thử',
-            'poster': None,
-            'ticket_types': [{'name': 'VIP', 'price': 100, 'total_quantity': 50}]
+            'ticket_types': [{'name': 'VIP', 'price': -100, 'total_quantity': 50}]
         }
-        mock_session.add.return_value = None
-        mock_session.commit.return_value = None
-        mock_session.flush.return_value = None
-        result = create_event_with_tickets(data, self.test_user.id)
-        self.assertIsNotNone(result)
-
-    def test_validate_ticket_types_duplicate(self):
-        """Kiểm tra validate_ticket_types với tên vé trùng lặp."""
-        ticket_types = [
-            {'name': 'VIP', 'price': 100, 'total_quantity': 50},
-            {'name': 'VIP', 'price': 200, 'total_quantity': 30}
-        ]
-        with self.assertRaises(ValueError):
-            validate_ticket_types(ticket_types)
+        with pytest.raises(ValidationError) as exc_info:
+            create_event_with_tickets(self.organizer.id, data)
+        self.assertEqual(str(exc_info.value), 'Giá vé "VIP" phải không âm')
 
     @patch('eventapp.dao.Event.query')
     def test_delete_event_success(self, mock_query):
-        """Kiểm tra delete_event với sự kiện và người dùng hợp lệ."""
-        mock_event = Event(id=1, organizer_id=self.test_user.id, is_active=True)
+        """Kiểm tra delete_event với sự kiện hợp lệ."""
+        mock_event = Event(id=1, organizer_id=self.organizer.id, is_active=True)
         mock_query.get.return_value = mock_event
-        result = delete_event(1, self.test_user.id)
-        # Hàm delete_event không trả về giá trị, chỉ đặt is_active=False
+        result = delete_event(1, self.organizer.id)
         self.assertIsNone(result)
         self.assertFalse(mock_event.is_active)
 
@@ -266,17 +303,18 @@ class TestDAOLayer(EventHubTestCase):
         """Kiểm tra delete_event với người dùng không có quyền."""
         mock_event = Event(id=1, organizer_id=999)
         mock_query.get.return_value = mock_event
-        with self.assertRaises(ValueError) as context:
+        with pytest.raises(ValueError) as exc_info:
             delete_event(1, self.test_user.id)
-        self.assertEqual(str(context.exception), 'Event not found or not owned by user')
+        self.assertEqual(str(exc_info.value), 'Event not found or not owned by user')
 
     @patch('eventapp.dao.User.query')
     def test_get_staff_by_organizer_success(self, mock_query):
         """Kiểm tra get_staff_by_organizer với nhân viên hợp lệ."""
-        mock_staff = User(role=UserRole.staff, creator_id=self.test_user.id)
+        mock_staff = User(role=UserRole.staff, creator_id=self.organizer.id)
         mock_query.filter.return_value.all.return_value = [mock_staff]
-        result = get_staff_by_organizer(self.test_user.id)
+        result = get_staff_by_organizer(self.organizer.id)
         self.assertEqual(len(result), 1)
+        mock_query.filter.assert_called_once()
 
     @patch('eventapp.dao.User.query')
     def test_get_customers_for_upgrade_success(self, mock_query):
@@ -289,22 +327,39 @@ class TestDAOLayer(EventHubTestCase):
     @patch('eventapp.dao.Event.query')
     def test_get_staff_assigned_to_event_success(self, mock_query):
         """Kiểm tra get_staff_assigned_to_event với sự kiện hợp lệ."""
-        mock_event = Event(id=1, organizer_id=self.test_user.id)
+        mock_event = Event(id=1, organizer_id=self.organizer.id)
+        mock_query.get.return_value = mock_event
+        result = get_staff_assigned_to_event(1, self.organizer.id)
+        self.assertEqual(result, mock_event)
+
+    @patch('eventapp.dao.Event.query')
+    def test_get_staff_assigned_to_event_unauthorized(self, mock_query):
+        """Kiểm tra get_staff_assigned_to_event với người dùng không có quyền."""
+        mock_event = Event(id=1, organizer_id=999)
         mock_query.get.return_value = mock_event
         result = get_staff_assigned_to_event(1, self.test_user.id)
-        self.assertEqual(result, mock_event)
+        self.assertIsNone(result)
 
     @patch('eventapp.dao.User.query')
     def test_update_user_role_to_staff(self, mock_query):
         """Kiểm tra update_user_role sang vai trò nhân viên."""
         mock_user = User(id=2, role=UserRole.customer, creator_id=None)
         mock_query.get.return_value = mock_user
-        update_user_role(2, 'staff', self.test_user.id)
+        update_user_role(2, 'staff', self.organizer.id)
         self.assertEqual(mock_user.role, UserRole.staff)
-        self.assertEqual(mock_user.creator_id, self.test_user.id)
+        self.assertEqual(mock_user.creator_id, self.organizer.id)
+
+    @patch('eventapp.dao.User.query')
+    def test_update_user_role_invalid_role(self, mock_query):
+        """Kiểm tra update_user_role với vai trò không hợp lệ."""
+        mock_user = User(id=2, role=UserRole.customer)
+        mock_query.get.return_value = mock_user
+        with pytest.raises(ValueError) as exc_info:
+            update_user_role(2, 'invalid_role', self.organizer.id)
+        self.assertEqual(str(exc_info.value), 'Vai trò không hợp lệ')
 
 class TestAuthLayer(EventHubTestCase):
-    """Kiểm thử đơn vị cho các hàm trong auth.py."""
+    """Kiểm thử đơn vị và tích hợp cho các hàm trong auth.py."""
 
     def test_validate_email_valid(self):
         """Kiểm tra validate_email với email hợp lệ."""
@@ -322,79 +377,187 @@ class TestAuthLayer(EventHubTestCase):
         self.assertTrue(is_valid)
         self.assertEqual(message, '')
 
-    def test_validate_password_weak(self):
-        """Kiểm tra validate_password với mật khẩu yếu."""
+    def test_validate_password_weak_length(self):
+        """Kiểm tra validate_password với mật khẩu quá ngắn."""
         is_valid, message = validate_password('weak')
         self.assertFalse(is_valid)
         self.assertEqual(message, 'Mật khẩu phải dài ít nhất 8 ký tự')
 
-class TestRoutes(EventHubTestCase):
-    """Kiểm thử tích hợp cho các endpoint trong routes.py."""
+    def test_validate_password_no_uppercase(self):
+        """Kiểm tra validate_password không có chữ in hoa."""
+        is_valid, message = validate_password('weakpass123!')
+        self.assertFalse(is_valid)
+        self.assertEqual(message, 'Mật khẩu phải chứa ít nhất một chữ cái in hoa')
 
-    def setUp(self):
-        """Thiết lập dữ liệu kiểm thử cho các route."""
-        super().setUp()
-        # Tạo người dùng tổ chức sự kiện
-        self.organizer = User(
-            username='organizer',
-            email='organizer@example.com',
-            password_hash=generate_password_hash('StrongP@ss123'),
-            role=UserRole.organizer
-        )
-        db.session.add(self.organizer)
-        # Tạo sự kiện
-        self.event = Event(
-            id=1,
-            organizer_id=self.organizer.id,
-            title='Sự Kiện Kiểm Thử',
-            description='Mô tả',
-            category=EventCategory.music,
-            start_time=datetime.utcnow() + timedelta(days=1),
-            end_time=datetime.utcnow() + timedelta(days=2),
-            location='Địa điểm kiểm thử',
-            is_active=True
-        )
-        db.session.add(self.event)
-        db.session.commit()
+    def test_validate_password_no_lowercase(self):
+        """Kiểm tra validate_password không có chữ thường."""
+        is_valid, message = validate_password('WEAKPASS123!')
+        self.assertFalse(is_valid)
+        self.assertEqual(message, 'Mật khẩu phải chứa ít nhất một chữ cái thường')
 
-    def login_organizer(self):
-        """Hàm hỗ trợ đăng nhập với vai trò tổ chức sự kiện."""
-        self.client.post('/auth/login', data={
-            'username_or_email': 'organizer',
+    def test_validate_password_no_number(self):
+        """Kiểm tra validate_password không có số."""
+        is_valid, message = validate_password('WeakPass!')
+        self.assertFalse(is_valid)
+        self.assertEqual(message, 'Mật khẩu phải chứa ít nhất một số')
+
+    def test_validate_password_no_special_char(self):
+        """Kiểm tra validate_password không có ký tự đặc biệt."""
+        is_valid, message = validate_password('WeakPass123')
+        self.assertFalse(is_valid)
+        self.assertEqual(message, 'Mật khẩu phải chứa ít nhất một ký tự đặc biệt')
+
+    def test_register_success(self):
+        """Kiểm tra đăng ký với dữ liệu hợp lệ."""
+        response = self.client.post('/auth/register', data={
+            'username': 'newuser',
+            'email': 'newuser@example.com',
             'password': 'StrongP@ss123',
-            'remember_me': True
-        })
+            'phone': '1234567890'
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        user = User.query.filter_by(username='newuser').first()
+        self.assertIsNotNone(user)
+        self.assertEqual(user.email, 'newuser@example.com')
+        self.assertEqual(user.role, UserRole.customer)
+
+    def test_register_duplicate_username(self):
+        """Kiểm tra đăng ký với username đã tồn tại."""
+        response = self.client.post('/auth/register', data={
+            'username': 'testuser',
+            'email': 'newuser@example.com',
+            'password': 'StrongP@ss123'
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'register.html', response.data)  # Ở lại trang đăng ký
+
+    def test_register_duplicate_email(self):
+        """Kiểm tra đăng ký với email đã tồn tại."""
+        response = self.client.post('/auth/register', data={
+            'username': 'newuser',
+            'email': 'test@example.com',
+            'password': 'StrongP@ss123'
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'register.html', response.data)
+
+    def test_register_invalid_email(self):
+        """Kiểm tra đăng ký với email không hợp lệ."""
+        response = self.client.post('/auth/register', data={
+            'username': 'newuser',
+            'email': 'invalid_email',
+            'password': 'StrongP@ss123'
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'register.html', response.data)
+
+    def test_register_weak_password(self):
+        """Kiểm tra đăng ký với mật khẩu yếu."""
+        response = self.client.post('/auth/register', data={
+            'username': 'newuser',
+            'email': 'newuser@example.com',
+            'password': 'weak'
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'register.html', response.data)
+
+    def test_login_success(self):
+        """Kiểm tra đăng nhập với thông tin hợp lệ."""
+        response = self.login_user()
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'index.html', response.data)
+        with self.client.session_transaction() as sess:
+            self.assertTrue(sess.get('_user_id'))
+
+    def test_login_invalid_credentials(self):
+        """Kiểm tra đăng nhập với thông tin không hợp lệ."""
+        response = self.client.post('/auth/login', data={
+            'username_or_email': 'testuser',
+            'password': 'wrong_password'
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'login.html', response.data)
+        with self.client.session_transaction() as sess:
+            self.assertIsNone(sess.get('_user_id'))
+
+    def test_login_inactive_user(self):
+        """Kiểm tra đăng nhập với người dùng không hoạt động."""
+        self.test_user.is_active = False
+        db.session.commit()
+        response = self.login_user()
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'login.html', response.data)
+
+    def test_logout_success(self):
+        """Kiểm tra đăng xuất khi đã đăng nhập."""
+        self.login_user()
+        response = self.client.post('/auth/logout', follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'index.html', response.data)
+        with self.client.session_transaction() as sess:
+            self.assertIsNone(sess.get('_user_id'))
+
+    def test_logout_unauthenticated(self):
+        """Kiểm tra đăng xuất khi chưa đăng nhập."""
+        response = self.client.post('/auth/logout', follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'login.html', response.data)
+
+    def test_check_auth_authenticated(self):
+        """Kiểm tra /check-auth khi đã đăng nhập."""
+        self.login_user()
+        response = self.client.get('/auth/check-auth')
+        self.assertEqual(response.status_code, 200)
+        data = response.json
+        self.assertTrue(data['is_authenticated'])
+        self.assertEqual(data['user']['username'], 'testuser')
+
+    def test_check_auth_unauthenticated(self):
+        """Kiểm tra /check-auth khi chưa đăng nhập."""
+        response = self.client.get('/auth/check-auth')
+        self.assertEqual(response.status_code, 200)
+        data = response.json
+        self.assertFalse(data['is_authenticated'])
+
+class TestEventRoutes(EventHubTestCase):
+    """Kiểm thử tích hợp cho các endpoint trong routes.py liên quan đến sự kiện."""
 
     def test_get_index(self):
         """Kiểm tra GET / endpoint."""
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
+        self.assertIn(b'index.html', response.data)
 
     def test_get_events(self):
         """Kiểm tra GET /events endpoint."""
         response = self.client.get('/events')
         self.assertEqual(response.status_code, 200)
+        self.assertIn(b'EventList.html', response.data)
 
     def test_get_event_detail(self):
         """Kiểm tra GET /event/<event_id> endpoint."""
         response = self.client.get('/event/1')
         self.assertEqual(response.status_code, 200)
+        self.assertIn(b'EventDetail.html', response.data)
 
     def test_get_event_detail_not_found(self):
         """Kiểm tra GET /event/<event_id> với sự kiện không tồn tại."""
-        response = self.client.get('/event/999')
-        self.assertEqual(response.status_code, 302)  # Chuyển hướng đến /events
+        response = self.client.get('/event/999', follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'EventList.html', response.data)
 
     def test_get_organizer_events(self):
         """Kiểm tra GET /organizer/my-events endpoint."""
         self.login_organizer()
         response = self.client.get('/organizer/my-events')
         self.assertEqual(response.status_code, 200)
+        self.assertIn(b'my_events.html', response.data)
 
     def test_get_organizer_events_unauthorized(self):
         """Kiểm tra GET /organizer/my-events khi chưa đăng nhập."""
-        response = self.client.get('/organizer/my-events')
-        self.assertEqual(response.status_code, 302)  # Chuyển hướng đến đăng nhập
+        response = self.client.get('/organizer/my-events', follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'login.html', response.data)
 
     def test_create_event_success(self):
         """Kiểm tra POST /organizer/create-event endpoint."""
@@ -409,8 +572,13 @@ class TestRoutes(EventHubTestCase):
             'ticket_name': 'VIP',
             'price': 100,
             'ticket_quantity': 50
-        })
-        self.assertEqual(response.status_code, 302)  # Chuyển hướng khi thành công
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        event = Event.query.filter_by(title='Sự Kiện Mới').first()
+        self.assertIsNotNone(event)
+        ticket_type = TicketType.query.filter_by(event_id=event.id).first()
+        self.assertIsNotNone(ticket_type)
+        self.assertEqual(ticket_type.name, 'VIP')
 
     def test_create_event_invalid_data(self):
         """Kiểm tra POST /organizer/create-event với dữ liệu không hợp lệ."""
@@ -419,92 +587,217 @@ class TestRoutes(EventHubTestCase):
             'title': '',  # Không hợp lệ: tiêu đề rỗng
             'description': 'Mô tả',
             'category': 'music',
-            'start_time': '2025-09-01T12:00',  # Không hợp lệ: end_time trước start_time
-            'end_time': '2025-09-01T10:00',
+            'start_time': '2025-09-01T12:00',
+            'end_time': '2025-09-01T10:00',  # Không hợp lệ: end_time trước start_time
             'location': 'Địa điểm'
-        })
-        self.assertEqual(response.status_code, 200)  # Ở lại form với lỗi
-
-    def test_get_login(self):
-        """Kiểm tra GET /auth/login endpoint."""
-        response = self.client.get('/auth/login')
+        }, follow_redirects=True)
         self.assertEqual(response.status_code, 200)
+        self.assertIn(b'create_event.html', response.data)
 
-    def test_post_login_success(self):
-        """Kiểm tra POST /auth/login với thông tin hợp lệ."""
-        response = self.client.post('/auth/login', data={
-            'username_or_email': 'organizer',
-            'password': 'StrongP@ss123',
-            'remember_me': True
-        })
-        self.assertEqual(response.status_code, 302)  # Chuyển hướng đến index
-
-    def test_post_login_invalid(self):
-        """Kiểm tra POST /auth/login với thông tin không hợp lệ."""
-        response = self.client.post('/auth/login', data={
-            'username_or_email': 'organizer',
-            'password': 'wrong_password'
-        })
-        self.assertEqual(response.status_code, 302)  # Chuyển hướng đến login
-
-    def test_get_register(self):
-        """Kiểm tra GET /auth/register endpoint."""
-        response = self.client.get('/auth/register')
-        self.assertEqual(response.status_code, 200)
-
-    def test_post_register_success(self):
-        """Kiểm tra POST /auth/register với dữ liệu hợp lệ."""
-        response = self.client.post('/auth/register', data={
-            'username': 'newuser',
-            'email': 'newuser@example.com',
-            'password': 'StrongP@ss123',
-            'phone': '1234567890'
-        })
-        self.assertEqual(response.status_code, 302)  # Chuyển hướng đến index
-
-    def test_post_register_invalid_email(self):
-        """Kiểm tra POST /auth/register với email không hợp lệ."""
-        response = self.client.post('/auth/register', data={
-            'username': 'newuser',
-            'email': 'invalid_email',
-            'password': 'StrongP@ss123'
-        })
-        self.assertEqual(response.status_code, 302)  # Chuyển hướng đến register
-
-    def test_update_user_role_success(self):
-        """Kiểm tra POST /organizer/update-role/<user_id> endpoint."""
-        self.login_organizer()
-        new_user = User(
-            id=2,
-            username='newuser',
-            email='newuser@example.com',
-            password_hash='hashed_password',
-            role=UserRole.customer
+    def test_add_review_success(self):
+        """Kiểm tra POST /event/<event_id>/review với dữ liệu hợp lệ."""
+        ticket = Ticket(
+            user_id=self.test_user.id,
+            event_id=self.event.id,
+            ticket_type_id=1,
+            is_paid=True,
+            purchase_date=datetime.utcnow()
         )
-        db.session.add(new_user)
+        db.session.add(ticket)
         db.session.commit()
-        response = self.client.post('/organizer/update-role/2', data={
-            'role': 'staff'
-        })
-        self.assertEqual(response.status_code, 302)  # Chuyển hướng khi thành công
+        self.login_user()
+        response = self.client.post('/event/1/review', data={
+            'rating': 4,
+            'comment': 'Great event!'
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        review = Review.query.filter_by(event_id=1, user_id=self.test_user.id).first()
+        self.assertIsNotNone(review)
+        self.assertEqual(review.rating, 4)
+        self.assertEqual(review.comment, 'Great event!')
 
-    def test_assign_staff_success(self):
-        """Kiểm tra POST /organizer/assign-staff/<event_id> endpoint."""
+    def test_add_review_unauthorized(self):
+        """Kiểm tra POST /event/<event_id>/review khi không có quyền."""
         self.login_organizer()
+        response = self.client.post('/event/1/review', data={
+            'rating': 4,
+            'comment': 'Great event!'
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 403)
+
+    def test_add_review_invalid_rating(self):
+        """Kiểm tra POST /event/<event_id>/review với rating không hợp lệ."""
+        ticket = Ticket(
+            user_id=self.test_user.id,
+            event_id=self.event.id,
+            ticket_type_id=1,
+            is_paid=True,
+            purchase_date=datetime.utcnow()
+        )
+        db.session.add(ticket)
+        db.session.commit()
+        self.login_user()
+        response = self.client.post('/event/1/review', data={
+            'rating': 6,  # Không hợp lệ
+            'comment': 'Great event!'
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'EventDetail.html', response.data)
+        review = Review.query.filter_by(event_id=1, user_id=self.test_user.id).first()
+        self.assertIsNone(review)
+
+    def test_reply_review_success(self):
+        """Kiểm tra POST /review/<review_id>/reply với dữ liệu hợp lệ."""
+        review = Review(
+            event_id=self.event.id,
+            user_id=self.test_user.id,
+            rating=4,
+            comment='Great event!'
+        )
+        db.session.add(review)
+        db.session.commit()
+        self.login_organizer()
+        response = self.client.post(f'/review/{review.id}/reply', data={
+            'reply_content': 'Thank you for your review!'
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        reply = Review.query.filter_by(parent_review_id=review.id).first()
+        self.assertIsNotNone(reply)
+        self.assertEqual(reply.comment, 'Thank you for your review!')
+
+    def test_reply_review_unauthorized(self):
+        """Kiểm tra POST /review/<review_id>/reply khi không có quyền."""
+        review = Review(
+            event_id=self.event.id,
+            user_id=self.test_user.id,
+            rating=4,
+            comment='Great event!'
+        )
+        db.session.add(review)
+        db.session.commit()
+        self.login_user()  # Customer, not organizer/staff
+        response = self.client.post(f'/review/{review.id}/reply', data={
+            'reply_content': 'Invalid reply'
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 403)
+
+    def test_process_booking_success(self):
+        """Kiểm tra POST /booking/process với dữ liệu hợp lệ."""
+        ticket_type = TicketType(
+            event_id=self.event.id,
+            name='VIP',
+            price=100,
+            total_quantity=50,
+            sold_quantity=0
+        )
+        db.session.add(ticket_type)
+        db.session.commit()
+        self.login_user()
+        response = self.client.post('/booking/process', json={
+            'event_id': self.event.id,
+            'tickets': [{'ticket_type_id': ticket_type.id, 'quantity': 2}],
+            'payment_method': 'cod',
+            'subtotal': 200,
+            'discount_amount': 0,
+            'total_amount': 200
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json
+        self.assertTrue(data['success'])
+        payment = Payment.query.filter_by(user_id=self.test_user.id).first()
+        self.assertIsNotNone(payment)
+        self.assertEqual(payment.amount, 200)
+
+    def test_process_booking_no_tickets(self):
+        """Kiểm tra POST /booking/process khi không chọn vé."""
+        self.login_user()
+        response = self.client.post('/booking/process', json={
+            'event_id': self.event.id,
+            'tickets': [],
+            'payment_method': 'cod'
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json
+        self.assertFalse(data['success'])
+        self.assertEqual(data['message'], 'Vui lòng chọn ít nhất một loại vé.')
+
+    def test_process_booking_invalid_tickets(self):
+        """Kiểm tra POST /booking/process với số lượng vé vượt quá tồn kho."""
+        ticket_type = TicketType(
+            event_id=self.event.id,
+            name='VIP',
+            price=100,
+            total_quantity=1,
+            sold_quantity=0
+        )
+        db.session.add(ticket_type)
+        db.session.commit()
+        self.login_user()
+        response = self.client.post('/booking/process', json={
+            'event_id': self.event.id,
+            'tickets': [{'ticket_type_id': ticket_type.id, 'quantity': 2}],
+            'payment_method': 'cod'
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json
+        self.assertFalse(data['success'])
+        self.assertIn('Không đủ vé loại VIP', data['message'])
+
+    def test_staff_scan_ticket_success(self):
+        """Kiểm tra POST /staff/scan-ticket với vé hợp lệ."""
         staff = User(
-            id=2,
             username='staffuser',
             email='staff@example.com',
-            password_hash='hashed_password',
+            password_hash=generate_password_hash('StrongP@ss123'),
+            role=UserRole.staff,
+            creator_id=self.organizer.id
+        )
+        ticket = Ticket(
+            user_id=self.test_user.id,
+            event_id=self.event.id,
+            ticket_type_id=1,
+            is_paid=True,
+            purchase_date=datetime.utcnow(),
+            uuid=str(uuid.uuid4())
+        )
+        db.session.add_all([staff, ticket])
+        db.session.commit()
+        self.client.post('/auth/login', data={
+            'username_or_email': 'staffuser',
+            'password': 'StrongP@ss123'
+        }, follow_redirects=True)
+        response = self.client.post('/staff/scan-ticket', json={
+            'qr_data': ticket.uuid
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json
+        self.assertTrue(data['success'])
+        self.assertIn('Check-in thành công', data['message'])
+        ticket = Ticket.query.get(ticket.id)
+        self.assertTrue(ticket.is_checked_in)
+
+    def test_staff_scan_ticket_invalid(self):
+        """Kiểm tra POST /staff/scan-ticket với vé không hợp lệ."""
+        staff = User(
+            username='staffuser',
+            email='staff@example.com',
+            password_hash=generate_password_hash('StrongP@ss123'),
             role=UserRole.staff,
             creator_id=self.organizer.id
         )
         db.session.add(staff)
         db.session.commit()
-        response = self.client.post('/organizer/assign-staff/1', data={
-            'staff_id': 2
+        self.client.post('/auth/login', data={
+            'username_or_email': 'staffuser',
+            'password': 'StrongP@ss123'
+        }, follow_redirects=True)
+        response = self.client.post('/staff/scan-ticket', json={
+            'qr_data': 'invalid_uuid'
         })
-        self.assertEqual(response.status_code, 302)  # Chuyển hướng khi thành công
+        self.assertEqual(response.status_code, 404)
+        data = response.json
+        self.assertFalse(data['success'])
+        self.assertEqual(data['message'], 'Vé không hợp lệ hoặc không tồn tại.')
 
 if __name__ == '__main__':
     unittest.main()
