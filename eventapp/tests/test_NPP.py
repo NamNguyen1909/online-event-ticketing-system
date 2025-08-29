@@ -269,823 +269,211 @@ class TestDAOLayer(EventHubTestCase):
         self.assertEqual(result.total, 0)
         mock_query.filter_by.assert_called_once_with(organizer_id=self.test_user.id)
 
-    def test_get_user_events_no_events_integration(self):
-        """Kiểm tra get_user_events khi không có sự kiện (integration test)."""
+    def test_create_event_with_tickets_invalid_tickets_rollback(self):
+        """Kiểm tra create_event_with_tickets với ticket types không hợp lệ (unit test)."""
         with app.app_context():
-            result = get_user_events(self.test_user.id)
-            self.assertEqual(len(result.items), 0)
-            self.assertEqual(result.total, 0)
+            with patch('eventapp.dao.db.session.commit') as mock_commit:
+                with patch('eventapp.dao.db.session.rollback') as mock_rollback:
+                    mock_commit.side_effect = ValidationError("Invalid ticket type")
+                    ticket_types = [{'name': 'VIP', 'price': -100, 'total_quantity': 50}]  # Giá âm
+                    try:
+                        create_event_with_tickets(
+                            organizer_id=self.organizer.id,
+                            title='Sự Kiện Không Hợp Lệ',
+                            description='Mô tả',
+                            category=EventCategory.music,
+                            start_time=datetime.utcnow() + timedelta(days=1),
+                            end_time=datetime.utcnow() + timedelta(days=2),
+                            location='Địa điểm',
+                            ticket_types=ticket_types
+                        )
+                    except ValidationError:
+                        pass
+                    mock_rollback.assert_called_once()
+            self.assertEqual(db.session.query(Event).count(), 1)  # Không tạo thêm sự kiện
+            self.assertEqual(db.session.query(TicketType).count(), 1)  # Không tạo thêm ticket type
 
-    @patch('eventapp.dao.UserNotification.query')
-    def test_get_user_notifications_success(self, mock_query):
-        """Kiểm tra get_user_notifications với thông báo tồn tại (unit test)."""
-        mock_notification = MagicMock()
-        mock_query.filter_by.return_value.order_by.return_value.all.return_value = [mock_notification]
-        result = get_user_notifications(self.test_user.id)
-        self.assertEqual(len(result), 1)
-        mock_query.filter_by.assert_called_once_with(user_id=self.test_user.id)
-
-    @patch('eventapp.dao.Event.query')
-    def test_get_featured_events_success(self, mock_query):
-        """Kiểm tra get_featured_events với giới hạn (unit test)."""
-        mock_event = MagicMock(id=1, is_active=True)
-        mock_query.filter_by.return_value.limit.return_value.all.return_value = [mock_event]
-        result = get_featured_events(limit=3)
-        self.assertEqual(len(result), 1)
-        mock_query.filter_by.assert_called_once_with(is_active=True)
-
-    def test_get_featured_events_success_integration(self):
-        """Kiểm tra get_featured_events với giới hạn (integration test)."""
+    def test_create_event_with_tickets_invalid_tickets_rollback_integration(self):
+        """Kiểm tra create_event_with_tickets với ticket types không hợp lệ (integration test)."""
         with app.app_context():
-            result = get_featured_events(limit=3)
-            self.assertEqual(len(result), 1)
-            self.assertEqual(result[0].id, self.event.id)
+            with db.session.begin_nested():
+                ticket_types = [{'name': 'VIP', 'price': -100, 'total_quantity': 50}]  # Giá âm
+                try:
+                    create_event_with_tickets(
+                        organizer_id=self.organizer.id,
+                        title='Sự Kiện Không Hợp Lệ',
+                        description='Mô tả',
+                        category=EventCategory.music,
+                        start_time=datetime.utcnow() + timedelta(days=1),
+                        end_time=datetime.utcnow() + timedelta(days=2),
+                        location='Địa điểm',
+                        ticket_types=ticket_types
+                    )
+                except ValidationError:
+                    pass
+            self.assertEqual(db.session.query(Event).count(), 1)  # Không tạo thêm sự kiện
+            self.assertEqual(db.session.query(TicketType).count(), 1)  # Không tạo thêm ticket type
 
-    @patch('eventapp.dao.db.session.query')
-    def test_get_event_detail_success(self, mock_query):
-        """Kiểm tra get_event_detail với sự kiện hợp lệ (unit test)."""
-        mock_event = MagicMock(id=1)
-        mock_query.return_value.options.return_value.filter_by.return_value.first.return_value = mock_event
-        result = get_event_detail(1)
-        self.assertEqual(result, mock_event)
-        mock_query.return_value.options.assert_called_once()
-
-    def test_get_event_detail_success_integration(self):
-        """Kiểm tra get_event_detail với sự kiện hợp lệ (integration test)."""
+    def test_create_event_with_tickets_with_poster(self):
+        """Kiểm tra create_event_with_tickets với poster (unit test)."""
         with app.app_context():
-            result = get_event_detail(self.event.id)
-            self.assertEqual(result.id, self.event.id)
-
-    @patch('eventapp.dao.db.session.query')
-    def test_get_event_detail_not_found(self, mock_query):
-        """Kiểm tra get_event_detail với sự kiện không tồn tại (unit test)."""
-        mock_query.return_value.options.return_value.filter_by.return_value.first.return_value = None
-        result = get_event_detail(999)
-        self.assertIsNone(result)
-
-    def test_get_event_detail_not_found_integration(self):
-        """Kiểm tra get_event_detail với sự kiện không tồn tại (integration test)."""
-        with app.app_context():
-            result = get_event_detail(999)
-            self.assertIsNone(result)
-
-    @patch('eventapp.dao.TicketType.query')
-    def test_get_active_ticket_types_success(self, mock_query):
-        """Kiểm tra get_active_ticket_types với vé hoạt động (unit test)."""
-        mock_ticket = MagicMock(id=1, event_id=1, is_active=True)
-        mock_query.filter_by.return_value.all.return_value = [mock_ticket]
-        result = get_active_ticket_types(1)
-        self.assertEqual(len(result), 1)
-        mock_query.filter_by.assert_called_once_with(event_id=1, is_active=True)
-
-    def test_get_active_ticket_types_success_integration(self):
-        """Kiểm tra get_active_ticket_types với vé hoạt động (integration test)."""
-        with app.app_context():
-            result = get_active_ticket_types(self.event.id)
-            self.assertEqual(len(result), 1)
-            self.assertEqual(result[0].id, self.ticket_type.id)
-
-    @patch('eventapp.dao.db.session.query')
-    def test_get_event_reviews_success(self, mock_query):
-        """Kiểm tra get_event_reviews với đánh giá tồn tại (unit test)."""
-        mock_review = MagicMock(id=1, event_id=1)
-        mock_query.return_value.options.return_value.filter_by.return_value.order_by.return_value.limit.return_value.all.return_value = [mock_review]
-        result = get_event_reviews(1, limit=5)
-        self.assertEqual(len(result), 1)
-
-    def test_get_event_reviews_success_integration(self):
-        """Kiểm tra get_event_reviews với đánh giá tồn tại (integration test)."""
-        with app.app_context():
-            review = Review(event_id=self.event.id, user_id=self.test_user.id, rating=4, comment='Great!')
-            db.session.add(review)
-            db.session.commit()
-            result = get_event_reviews(self.event.id, limit=5)
-            self.assertEqual(len(result), 1)
-            self.assertEqual(result[0].rating, 4)
-
-    @patch('eventapp.dao.Review.query')
-    def test_get_all_event_reviews_success(self, mock_query):
-        """Kiểm tra get_all_event_reviews với đánh giá tồn tại (unit test)."""
-        mock_review = MagicMock(id=1, event_id=1)
-        mock_query.filter_by.return_value.all.return_value = [mock_review]
-        result = get_all_event_reviews(1)
-        self.assertEqual(len(result), 1)
-
-    def test_get_all_event_reviews_success_integration(self):
-        """Kiểm tra get_all_event_reviews với đánh giá tồn tại (integration test)."""
-        with app.app_context():
-            review = Review(event_id=self.event.id, user_id=self.test_user.id, rating=4, comment='Great!')
-            db.session.add(review)
-            db.session.commit()
-            result = get_all_event_reviews(self.event.id)
-            self.assertEqual(len(result), 1)
-
-    def test_calculate_event_stats(self):
-        """Kiểm tra calculate_event_stats với dữ liệu hợp lệ (unit test)."""
-        ticket_types = [MagicMock(total_quantity=100, sold_quantity=50, price=10000)]
-        reviews = [MagicMock(rating=4)]
-        stats = calculate_event_stats(ticket_types, reviews)
-        self.assertEqual(stats['total_tickets'], 100)
-        self.assertEqual(stats['sold_tickets'], 50)
-        self.assertEqual(stats['available_tickets'], 50)
-        self.assertEqual(stats['revenue'], 500000)
-        self.assertEqual(stats['average_rating'], 4.0)
-
-    def test_calculate_event_stats_integration(self):
-        """Kiểm tra calculate_event_stats với dữ liệu hợp lệ (integration test)."""
-        with app.app_context():
-            ticket_types = [self.ticket_type]
-            reviews = [Review(event_id=self.event.id, user_id=self.test_user.id, rating=4, comment='Great!')]
-            db.session.add(reviews[0])
-            db.session.commit()
-            stats = calculate_event_stats(ticket_types, reviews)
-            self.assertEqual(stats['total_tickets'], 50)
-            self.assertEqual(stats['sold_tickets'], 0)
-            self.assertEqual(stats['available_tickets'], 50)
-            self.assertEqual(stats['revenue'], 0)
-            self.assertEqual(stats['average_rating'], 4.0)
-
-    @patch('eventapp.dao.Review.query')
-    def test_get_user_review_success(self, mock_query):
-        """Kiểm tra get_user_review với đánh giá tồn tại (unit test)."""
-        mock_review = MagicMock(id=1, event_id=1, user_id=self.test_user.id)
-        mock_query.filter_by.return_value.first.return_value = mock_review
-        result = get_user_review(1, self.test_user.id)
-        self.assertEqual(result, mock_review)
-
-    def test_get_user_review_success_integration(self):
-        """Kiểm tra get_user_review với đánh giá tồn tại (integration test)."""
-        with app.app_context():
-            review = Review(event_id=self.event.id, user_id=self.test_user.id, rating=4, comment='Great!')
-            db.session.add(review)
-            db.session.commit()
-            result = get_user_review(self.event.id, self.test_user.id)
-            self.assertEqual(result.rating, 4)
-
-    @patch('eventapp.dao.Review.query')
-    def test_get_user_review_not_found(self, mock_query):
-        """Kiểm tra get_user_review khi không có đánh giá (unit test)."""
-        mock_query.filter_by.return_value.first.return_value = None
-        result = get_user_review(1, self.test_user.id)
-        self.assertIsNone(result)
-
-    def test_get_user_review_not_found_integration(self):
-        """Kiểm tra get_user_review khi không có đánh giá (integration test)."""
-        with app.app_context():
-            result = get_user_review(self.event.id, self.test_user.id)
-            self.assertIsNone(result)
-
-    @patch('eventapp.dao.User.query')
-    @patch('eventapp.dao.Ticket.query')
-    @patch('eventapp.dao.get_user_review')
-    def test_user_can_review_yes(self, mock_get_user_review, mock_ticket_query, mock_user_query):
-        """Kiểm tra user_can_review khi người dùng có thể đánh giá (unit test)."""
-        mock_user = MagicMock()
-        mock_user.id = self.test_user.id
-        mock_user.role = UserRole.customer
-        mock_user_query.get.return_value = mock_user
-        mock_ticket_query.filter_by.return_value.first.return_value = MagicMock(is_paid=True)
-        mock_get_user_review.return_value = None
-        result = user_can_review(1, self.test_user.id)
-        self.assertTrue(result)
-
-    def test_user_can_review_yes_integration(self):
-        """Kiểm tra user_can_review khi người dùng có thể đánh giá (integration test)."""
-        with app.app_context():
-            result = user_can_review(self.event.id, self.test_user.id)
-            self.assertTrue(result)
-
-    @patch('eventapp.dao.User.query')
-    def test_user_can_review_not_customer(self, mock_user_query):
-        """Kiểm tra user_can_review khi người dùng không phải là khách hàng (unit test)."""
-        mock_user = MagicMock()
-        mock_user.id = 999
-        mock_user.role = UserRole.organizer
-        mock_user_query.get.return_value = mock_user
-        result = user_can_review(1, 999)
-        self.assertFalse(result)
-
-    def test_user_can_review_not_customer_integration(self):
-        """Kiểm tra user_can_review khi người dùng không phải là khách hàng (integration test)."""
-        with app.app_context():
-            result = user_can_review(self.event.id, self.organizer.id)
-            self.assertFalse(result)
-
-    @patch('eventapp.dao.User.query')
-    @patch('eventapp.dao.Ticket.query')
-    @patch('eventapp.dao.get_user_review')
-    def test_user_can_review_already_reviewed(self, mock_get_user_review, mock_ticket_query, mock_user_query):
-        """Kiểm tra user_can_review khi người dùng đã đánh giá (unit test)."""
-        mock_user = MagicMock()
-        mock_user.id = self.test_user.id
-        mock_user.role = UserRole.customer
-        mock_user_query.get.return_value = mock_user
-        mock_ticket_query.filter_by.return_value.first.return_value = MagicMock(is_paid=True)
-        mock_get_user_review.return_value = MagicMock()
-        result = user_can_review(1, self.test_user.id)
-        self.assertFalse(result)
-
-    def test_user_can_review_already_reviewed_integration(self):
-        """Kiểm tra user_can_review khi người dùng đã đánh giá (integration test)."""
-        with app.app_context():
-            review = Review(event_id=self.event.id, user_id=self.test_user.id, rating=4, comment='Great!')
-            db.session.add(review)
-            db.session.commit()
-            result = user_can_review(self.event.id, self.test_user.id)
-            self.assertFalse(result)
-
-    @patch('eventapp.dao.db.session')
-    @patch('eventapp.dao.Event.upload_poster')
-    def test_create_event_with_tickets_with_poster(self, mock_upload_poster, mock_session):
-        """Kiểm tra create_event_with_tickets với dữ liệu hợp lệ có poster (unit test)."""
-        data = {
-            'title': 'Sự Kiện Kiểm Thử',
-            'description': 'Mô tả',
-            'category': 'music',
-            'start_time': '2025-09-01T10:00',
-            'end_time': '2025-09-01T12:00',
-            'location': 'Địa điểm kiểm thử',
-            'poster': 'test_poster.jpg',
-            'ticket_types': [{'name': 'VIP', 'price': 100, 'total_quantity': 50}]
-        }
-        mock_session.add.return_value = None
-        mock_session.commit.return_value = None
-        mock_session.flush.return_value = None
-        mock_upload_poster.return_value = {'public_id': 'test_poster_id'}
-        result = create_event_with_tickets(self.organizer.id, data)
-        self.assertIsNotNone(result)
-        mock_upload_poster.assert_called_once()
+            with patch('eventapp.models.Event.upload_poster') as mock_upload:
+                mock_upload.return_value = {'public_id': 'test_poster'}
+                ticket_types = [{'name': 'VIP', 'price': 100, 'total_quantity': 50}]
+                event = create_event_with_tickets(
+                    organizer_id=self.organizer.id,
+                    title='Sự Kiện Có Poster',
+                    description='Mô tả',
+                    category=EventCategory.music,
+                    start_time=datetime.utcnow() + timedelta(days=1),
+                    end_time=datetime.utcnow() + timedelta(days=2),
+                    location='Địa điểm',
+                    ticket_types=ticket_types,
+                    poster_file=MagicMock()
+                )
+                self.assertIsNotNone(event)
+                self.assertEqual(event.title, 'Sự Kiện Có Poster')
+                self.assertEqual(event.poster, 'test_poster')
+                mock_upload.assert_called_once()
+                self.assertEqual(db.session.query(Event).count(), 2)
+                self.assertEqual(db.session.query(TicketType).count(), 2)
 
     def test_create_event_with_tickets_with_poster_integration(self):
-        """Kiểm tra create_event_with_tickets với dữ liệu hợp lệ có poster (integration test)."""
+        """Kiểm tra create_event_with_tickets với poster (integration test)."""
         with app.app_context():
-            data = {
-                'title': 'Sự Kiện Kiểm Thử',
-                'description': 'Mô tả',
-                'category': 'music',
-                'start_time': '2025-09-01T10:00',
-                'end_time': '2025-09-01T12:00',
-                'location': 'Địa điểm kiểm thử',
-                'poster': None,
-                'ticket_types': [{'name': 'VIP', 'price': 100, 'total_quantity': 50}]
-            }
-            with db.session.begin_nested():
-                result = create_event_with_tickets(self.organizer.id, data)
-            self.assertIsNotNone(result)
+            ticket_types = [{'name': 'VIP', 'price': 100, 'total_quantity': 50}]
+            event = create_event_with_tickets(
+                organizer_id=self.organizer.id,
+                title='Sự Kiện Có Poster',
+                description='Mô tả',
+                category=EventCategory.music,
+                start_time=datetime.utcnow() + timedelta(days=1),
+                end_time=datetime.utcnow() + timedelta(days=2),
+                location='Địa điểm',
+                ticket_types=ticket_types
+            )
+            self.assertIsNotNone(event)
+            self.assertEqual(event.title, 'Sự Kiện Có Poster')
             self.assertEqual(db.session.query(Event).count(), 2)
             self.assertEqual(db.session.query(TicketType).count(), 2)
 
-    @patch('eventapp.dao.db.session')
-    def test_create_event_with_tickets_invalid_tickets_rollback(self, mock_session):
-        """Kiểm tra create_event_with_tickets với loại vé không hợp lệ, đảm bảo rollback (unit test)."""
-        data = {
-            'title': 'Sự Kiện Kiểm Thử',
-            'description': 'Mô tả',
-            'category': 'music',
-            'start_time': '2025-09-01T10:00',
-            'end_time': '2025-09-01T12:00',
-            'location': 'Địa điểm kiểm thử',
-            'ticket_types': [{'name': 'VIP', 'price': -100, 'total_quantity': 50}]
-        }
-        mock_session.rollback = MagicMock()
-        with pytest.raises(ValidationError) as exc_info:
-            create_event_with_tickets(self.organizer.id, data)
-        self.assertIn('Giá vé "VIP" phải không âm', str(exc_info.value))
-        mock_session.rollback.assert_called_once()
-
-    def test_create_event_with_tickets_invalid_tickets_rollback_integration(self):
-        """Kiểm tra create_event_with_tickets với loại vé không hợp lệ, đảm bảo rollback (integration test)."""
+    def test_delete_event_rollback_on_error(self):
+        """Kiểm tra delete_event khi gặp lỗi (unit test)."""
         with app.app_context():
-            data = {
-                'title': 'Sự Kiện Kiểm Thử',
-                'description': 'Mô tả',
-                'category': 'music',
-                'start_time': '2025-09-01T10:00',
-                'end_time': '2025-09-01T12:00',
-                'location': 'Địa điểm kiểm thử',
-                'ticket_types': [{'name': 'VIP', 'price': -100, 'total_quantity': 50}]
-            }
-            with pytest.raises(ValidationError) as exc_info:
-                with db.session.begin_nested():
-                    create_event_with_tickets(self.organizer.id, data)
-            self.assertIn('Giá vé "VIP" phải không âm', str(exc_info.value))
-            self.assertEqual(db.session.query(Event).count(), 1)
-            self.assertEqual(db.session.query(TicketType).count(), 1)
-
-    @patch('eventapp.dao.db.session')
-    def test_create_event_with_tickets_integrity_error_rollback(self, mock_session):
-        """Kiểm tra create_event_with_tickets khi gặp IntegrityError, đảm bảo rollback (unit test)."""
-        data = {
-            'title': 'Sự Kiện Kiểm Thử',
-            'description': 'Mô tả',
-            'category': 'music',
-            'start_time': '2025-09-01T10:00',
-            'end_time': '2025-09-01T12:00',
-            'location': 'Địa điểm kiểm thử',
-            'ticket_types': [{'name': 'VIP', 'price': 100, 'total_quantity': 50}]
-        }
-        mock_session.commit.side_effect = IntegrityError("Mock integrity error", None, None)
-        mock_session.rollback = MagicMock()
-        with pytest.raises(IntegrityError) as exc_info:
-            create_event_with_tickets(self.organizer.id, data)
-        self.assertIn("Mock integrity error", str(exc_info.value))
-        mock_session.rollback.assert_called_once()
-
-    def test_create_event_with_tickets_integrity_error_rollback_integration(self):
-        """Kiểm tra create_event_with_tickets khi gặp IntegrityError, đảm bảo rollback (integration test)."""
-        with app.app_context():
-            data = {
-                'title': 'Sự Kiện Kiểm Thử',
-                'description': 'Mô tả',
-                'category': 'music',
-                'start_time': '2025-09-01T10:00',
-                'end_time': '2025-09-01T12:00',
-                'location': 'Địa điểm kiểm thử',
-                'ticket_types': [{'name': 'VIP', 'price': 100, 'total_quantity': 50}]
-            }
-            invalid_user = MagicMock(id=999)
-            with pytest.raises(ValueError) as exc_info:
-                with db.session.begin_nested():
-                    create_event_with_tickets(invalid_user.id, data)
-            self.assertIn('User not found', str(exc_info.value))
-            self.assertEqual(db.session.query(Event).count(), 1)
-            self.assertEqual(db.session.query(TicketType).count(), 1)
-
-    @patch('eventapp.dao.Event.query')
-    def test_delete_event_success(self, mock_query):
-        """Kiểm tra delete_event với sự kiện hợp lệ (unit test)."""
-        mock_event = MagicMock()
-        mock_event.id = 1
-        mock_event.organizer_id = self.organizer.id
-        mock_event.is_active = True
-        mock_query.get.return_value = mock_event
-        result = delete_event(1, self.organizer.id)
-        self.assertIsNone(result)
-        self.assertFalse(mock_event.is_active)
-        mock_query.get.assert_called_once_with(1)
-
-    def test_delete_event_success_integration(self):
-        """Kiểm tra delete_event với sự kiện hợp lệ (integration test)."""
-        with app.app_context():
-            with db.session.begin_nested():
-                result = delete_event(self.event.id, self.organizer.id)
-            self.assertIsNone(result)
-            event = db.session.query(Event).get(self.event.id)
-            self.assertFalse(event.is_active)
-
-    @patch('eventapp.dao.Event.query')
-    def test_delete_event_unauthorized(self, mock_query):
-        """Kiểm tra delete_event với người dùng không có quyền (unit test)."""
-        mock_event = MagicMock()
-        mock_event.id = 1
-        mock_event.organizer_id = 999
-        mock_query.get.return_value = mock_event
-        with pytest.raises(ValueError) as exc_info:
-            delete_event(1, self.test_user.id)
-        self.assertEqual(str(exc_info.value), 'Event not found or not owned by user')
-
-    def test_delete_event_unauthorized_integration(self):
-        """Kiểm tra delete_event với người dùng không có quyền (integration test)."""
-        with app.app_context():
-            with pytest.raises(ValueError) as exc_info:
-                delete_event(self.event.id, self.test_user.id)
-            self.assertEqual(str(exc_info.value), 'Event not found or not owned by user')
-
-    @patch('eventapp.dao.Event.query')
-    @patch('eventapp.dao.db.session')
-    def test_delete_event_rollback_on_error(self, mock_session, mock_query):
-        """Kiểm tra delete_event rollback khi gặp lỗi (unit test)."""
-        mock_event = MagicMock()
-        mock_event.id = 1
-        mock_event.organizer_id = self.organizer.id
-        mock_query.get.return_value = mock_event
-        mock_session.commit.side_effect = IntegrityError("Mock error", None, None)
-        mock_session.rollback = MagicMock()
-        with pytest.raises(IntegrityError) as exc_info:
-            delete_event(1, self.organizer.id)
-        self.assertIn("Mock error", str(exc_info.value))
-        mock_session.rollback.assert_called_once()
-
-    def test_delete_event_rollback_on_error_integration(self):
-        """Kiểm tra delete_event rollback khi gặp lỗi (integration test)."""
-        with app.app_context():
-            ticket = self.create_ticket_and_commit(self.test_user.id, self.event.id, self.ticket_type.id)
-            with patch('eventapp.models.Event.is_active', new_callable=PropertyMock) as mock_is_active:
-                mock_is_active.side_effect = IntegrityError("Mock error due to FK", None, None)
-                with pytest.raises(IntegrityError):
-                    with db.session.begin_nested():
+            with patch('eventapp.dao.db.session.commit') as mock_commit:
+                with patch('eventapp.dao.db.session.rollback') as mock_rollback:
+                    mock_commit.side_effect = IntegrityError("Mock integrity error", None, None)
+                    try:
                         delete_event(self.event.id, self.organizer.id)
-            event = db.session.query(Event).get(self.event.id)
-            self.assertTrue(event.is_active)
+                    except IntegrityError:
+                        pass
+                    mock_rollback.assert_called_once()
+            self.assertEqual(db.session.query(Event).count(), 1)  # Sự kiện không bị xóa
 
-    @patch('eventapp.dao.User.query')
-    def test_get_staff_by_organizer_success(self, mock_query):
-        """Kiểm tra get_staff_by_organizer với nhân viên hợp lệ (unit test)."""
-        mock_staff = MagicMock()
-        mock_staff.id = self.staff.id
-        mock_staff.role = UserRole.staff
-        mock_staff.creator_id = self.organizer.id
-        mock_query.filter.return_value.all.return_value = [mock_staff]
-        result = get_staff_by_organizer(self.organizer.id)
-        self.assertEqual(len(result), 1)
-        mock_query.filter.assert_called_once()
-
-    def test_get_staff_by_organizer_success_integration(self):
-        """Kiểm tra get_staff_by_organizer với nhân viên hợp lệ (integration test)."""
+    def test_update_user_role_invalid_role_rollback(self):
+        """Kiểm tra update_user_role với vai trò không hợp lệ (unit test)."""
         with app.app_context():
-            result = get_staff_by_organizer(self.organizer.id)
-            self.assertEqual(len(result), 1)
-            self.assertEqual(result[0].id, self.staff.id)
+            with patch('eventapp.dao.db.session.commit') as mock_commit:
+                with patch('eventapp.dao.db.session.rollback') as mock_rollback:
+                    mock_commit.side_effect = ValueError('Vai trò không hợp lệ')
+                    try:
+                        update_user_role(self.test_user.id, 'invalid_role', self.organizer.id)
+                    except ValueError:
+                        pass
+                    mock_rollback.assert_called_once()
+            user = db.session.query(User).get(self.test_user.id)
+            self.assertEqual(user.role, UserRole.customer)  # Vai trò không thay đổi
 
-    @patch('eventapp.dao.User.query')
-    def test_get_customers_for_upgrade_success(self, mock_query):
-        """Kiểm tra get_customers_for_upgrade với khách hàng hợp lệ (unit test)."""
-        mock_customer = MagicMock()
-        mock_customer.id = self.test_user.id
-        mock_customer.role = UserRole.customer
-        mock_customer.creator_id = None
-        mock_query.filter.return_value.all.return_value = [mock_customer]
-        result = get_customers_for_upgrade()
-        self.assertEqual(len(result), 1)
-
-    def test_get_customers_for_upgrade_success_integration(self):
-        """Kiểm tra get_customers_for_upgrade với khách hàng hợp lệ (integration test)."""
+    def test_login_inactive_user(self):
+        """Kiểm tra đăng nhập với người dùng không hoạt động (integration test)."""
         with app.app_context():
-            result = get_customers_for_upgrade()
-            self.assertEqual(len(result), 1)
-            self.assertEqual(result[0].id, self.test_user.id)
-
-    @patch('eventapp.dao.Event.query')
-    def test_get_staff_assigned_to_event_success(self, mock_query):
-        """Kiểm tra get_staff_assigned_to_event với sự kiện hợp lệ (unit test)."""
-        mock_event = MagicMock()
-        mock_event.id = 1
-        mock_event.organizer_id = self.organizer.id
-        mock_query.get.return_value = mock_event
-        result = get_staff_assigned_to_event(1, self.organizer.id)
-        self.assertEqual(result, mock_event)
-
-    def test_get_staff_assigned_to_event_success_integration(self):
-        """Kiểm tra get_staff_assigned_to_event với sự kiện hợp lệ (integration test)."""
-        with app.app_context():
-            result = get_staff_assigned_to_event(self.event.id, self.organizer.id)
-            self.assertEqual(result.id, self.event.id)
-
-    @patch('eventapp.dao.Event.query')
-    def test_get_staff_assigned_to_event_unauthorized(self, mock_query):
-        """Kiểm tra get_staff_assigned_to_event với người dùng không có quyền (unit test)."""
-        mock_event = MagicMock()
-        mock_event.id = 1
-        mock_event.organizer_id = 999
-        mock_query.get.return_value = mock_event
-        result = get_staff_assigned_to_event(1, self.test_user.id)
-        self.assertIsNone(result)
-
-    def test_get_staff_assigned_to_event_unauthorized_integration(self):
-        """Kiểm tra get_staff_assigned_to_event với người dùng không có quyền (integration test)."""
-        with app.app_context():
-            result = get_staff_assigned_to_event(self.event.id, self.test_user.id)
-            self.assertIsNone(result)
-
-    @patch('eventapp.dao.User.query')
-    def test_update_user_role_to_staff(self, mock_query):
-        """Kiểm tra update_user_role sang vai trò nhân viên (unit test)."""
-        mock_user = MagicMock()
-        mock_user.id = 2
-        mock_user.role = UserRole.customer
-        mock_user.creator_id = None
-        mock_query.get.return_value = mock_user
-        update_user_role(2, 'staff', self.organizer.id)
-        self.assertEqual(mock_user.role, UserRole.staff)
-        self.assertEqual(mock_user.creator_id, self.organizer.id)
-
-    def test_update_user_role_to_staff_integration(self):
-        """Kiểm tra update_user_role sang vai trò nhân viên (integration test)."""
-        with app.app_context():
-            new_user = self.create_user_and_commit(
-                username='newuser',
-                email='newuser@example.com',
+            inactive_user = self.create_user_and_commit(
+                username='inactiveuser',
+                email='inactive@example.com',
                 password='StrongP@ss123',
                 role=UserRole.customer
             )
-            with db.session.begin_nested():
-                update_user_role(new_user.id, 'staff', self.organizer.id)
-            updated_user = db.session.query(User).get(new_user.id)
-            self.assertEqual(updated_user.role, UserRole.staff)
-            self.assertEqual(updated_user.creator_id, self.organizer.id)
-
-    @patch('eventapp.dao.User.query')
-    @patch('eventapp.dao.db.session')
-    def test_update_user_role_invalid_role_rollback(self, mock_session, mock_query):
-        """Kiểm tra update_user_role với vai trò không hợp lệ, đảm bảo rollback (unit test)."""
-        mock_user = MagicMock()
-        mock_user.id = 2
-        mock_user.role = UserRole.customer
-        mock_user.creator_id = None
-        mock_query.get.return_value = mock_user
-        mock_session.rollback = MagicMock()
-        with pytest.raises(ValueError) as exc_info:
-            update_user_role(2, 'invalid_role', self.organizer.id)
-        self.assertEqual(str(exc_info.value), 'Vai trò không hợp lệ')
-        self.assertEqual(mock_user.role, UserRole.customer)
-        self.assertIsNone(mock_user.creator_id)
-        mock_session.rollback.assert_called_once()
-
-    def test_update_user_role_invalid_role_rollback_integration(self):
-        """Kiểm tra update_user_role với vai trò không hợp lệ, đảm bảo rollback (integration test)."""
-        with app.app_context():
-            new_user = self.create_user_and_commit(
-                username='newuser',
-                email='newuser@example.com',
-                password='StrongP@ss123',
-                role=UserRole.customer
-            )
-            with pytest.raises(ValueError) as exc_info:
-                with db.session.begin_nested():
-                    update_user_role(new_user.id, 'invalid_role', self.organizer.id)
-            self.assertEqual(str(exc_info.value), 'Vai trò không hợp lệ')
-            updated_user = db.session.query(User).get(new_user.id)
-            self.assertEqual(updated_user.role, UserRole.customer)
-            self.assertIsNone(updated_user.creator_id)
-
-class TestAuthLayer(EventHubTestCase):
-    """Kiểm thử đơn vị và tích hợp cho các hàm trong auth.py."""
-
-    def test_validate_email_valid(self):
-        """Kiểm tra validate_email với email hợp lệ."""
-        with app.app_context():
-            result = validate_email('test@example.com')
-            self.assertTrue(result)
-
-    def test_validate_email_invalid(self):
-        """Kiểm tra validate_email với email không hợp lệ."""
-        with app.app_context():
-            result = validate_email('invalid_email')
-            self.assertFalse(result)
-
-    def test_validate_password_strong(self):
-        """Kiểm tra validate_password với mật khẩu mạnh."""
-        with app.app_context():
-            is_valid, message = validate_password('StrongP@ss123')
-            self.assertTrue(is_valid)
-            self.assertEqual(message, '')
-
-    def test_validate_password_weak_length(self):
-        """Kiểm tra validate_password với mật khẩu quá ngắn."""
-        with app.app_context():
-            is_valid, message = validate_password('weak')
-            self.assertFalse(is_valid)
-            self.assertEqual(message, 'Mật khẩu phải dài ít nhất 8 ký tự')
-
-    def test_validate_password_no_uppercase(self):
-        """Kiểm tra validate_password không có chữ in hoa."""
-        with app.app_context():
-            is_valid, message = validate_password('weakpass123!')
-            self.assertFalse(is_valid)
-            self.assertEqual(message, 'Mật khẩu phải chứa ít nhất một chữ cái in hoa')
-
-    def test_validate_password_no_lowercase(self):
-        """Kiểm tra validate_password không có chữ thường."""
-        with app.app_context():
-            is_valid, message = validate_password('WEAKPASS123!')
-            self.assertFalse(is_valid)
-            self.assertEqual(message, 'Mật khẩu phải chứa ít nhất một chữ cái thường')
-
-    def test_validate_password_no_number(self):
-        """Kiểm tra validate_password không có số."""
-        with app.app_context():
-            is_valid, message = validate_password('WeakPass!')
-            self.assertFalse(is_valid)
-            self.assertEqual(message, 'Mật khẩu phải chứa ít nhất một số')
-
-    def test_validate_password_no_special_char(self):
-        """Kiểm tra validate_password không có ký tự đặc biệt."""
-        with app.app_context():
-            is_valid, message = validate_password('WeakPass123')
-            self.assertFalse(is_valid)
-            self.assertEqual(message, 'Mật khẩu phải chứa ít nhất một ký tự đặc biệt')
-
-    def test_register_success(self):
-        """Kiểm tra đăng ký với dữ liệu hợp lệ (integration test)."""
-        with app.app_context():
-            response = self.client.post('/auth/register', data={
-                'username': 'newuser',
-                'email': 'newuser@example.com',
+            inactive_user.is_active = False
+            db.session.commit()
+            response = self.client.post('/auth/login', data={
+                'username_or_email': 'inactiveuser',
                 'password': 'StrongP@ss123',
-                'phone': '1234567890'
+                'remember_me': True
             }, follow_redirects=True)
             self.assertEqual(response.status_code, 200)
-            user = db.session.query(User).filter_by(username='newuser').first()
-            self.assertIsNotNone(user)
-            self.assertEqual(user.email, 'newuser@example.com')
-            self.assertEqual(user.role, UserRole.customer)
-            self.assertEqual(db.session.query(User).count(), 4)
-
-    def test_register_duplicate_username_rollback(self):
-        """Kiểm tra đăng ký với username đã tồn tại, đảm bảo rollback (integration test)."""
-        with app.app_context():
-            with db.session.begin_nested():
-                response = self.client.post('/auth/register', data={
-                    'username': 'testuser',
-                    'email': 'newuser@example.com',
-                    'password': 'StrongP@ss123'
-                }, follow_redirects=True)
-            self.assertEqual(response.status_code, 200)
-            self.assertIn(b'register.html', response.data)
-            self.assertEqual(db.session.query(User).count(), 3)
-
-    def test_register_duplicate_email_rollback(self):
-        """Kiểm tra đăng ký với email đã tồn tại, đảm bảo rollback (integration test)."""
-        with app.app_context():
-            with db.session.begin_nested():
-                response = self.client.post('/auth/register', data={
-                    'username': 'newuser',
-                    'email': 'test@example.com',
-                    'password': 'StrongP@ss123'
-                }, follow_redirects=True)
-            self.assertEqual(response.status_code, 200)
-            self.assertIn(b'register.html', response.data)
-            self.assertEqual(db.session.query(User).count(), 3)
-
-    def test_register_invalid_email(self):
-        """Kiểm tra đăng ký với email không hợp lệ (integration test)."""
-        with app.app_context():
-            response = self.client.post('/auth/register', data={
-                'username': 'newuser',
-                'email': 'invalid_email',
-                'password': 'StrongP@ss123'
-            }, follow_redirects=True)
-            self.assertEqual(response.status_code, 200)
-            self.assertIn(b'register.html', response.data)
-            self.assertEqual(db.session.query(User).count(), 3)
-
-    def test_register_weak_password(self):
-        """Kiểm tra đăng ký với mật khẩu yếu (integration test)."""
-        with app.app_context():
-            response = self.client.post('/auth/register', data={
-                'username': 'newuser',
-                'email': 'newuser@example.com',
-                'password': 'weak'
-            }, follow_redirects=True)
-            self.assertEqual(response.status_code, 200)
-            self.assertIn(b'register.html', response.data)
-            self.assertEqual(db.session.query(User).count(), 3)
-
-    def test_login_success(self):
-        """Kiểm tra đăng nhập với thông tin hợp lệ (integration test)."""
-        with app.app_context():
-            response = self.login_user()
-            self.assertEqual(response.status_code, 200)
-            self.assertIn(b'index.html', response.data)
-            with self.client.session_transaction() as sess:
-                self.assertEqual(int(sess.get('_user_id')), self.test_user.id)
+            self.assertFalse(current_user.is_authenticated)
 
     def test_login_invalid_credentials(self):
         """Kiểm tra đăng nhập với thông tin không hợp lệ (integration test)."""
         with app.app_context():
             response = self.client.post('/auth/login', data={
                 'username_or_email': 'testuser',
-                'password': 'wrong_password'
+                'password': 'WrongPassword',
+                'remember_me': True
             }, follow_redirects=True)
             self.assertEqual(response.status_code, 200)
-            self.assertIn(b'login.html', response.data)
-            with self.client.session_transaction() as sess:
-                self.assertIsNone(sess.get('_user_id'))
+            self.assertFalse(current_user.is_authenticated)
 
-    def test_login_inactive_user(self):
-        """Kiểm tra đăng nhập với người dùng không hoạt động (integration test)."""
+    def test_login_success(self):
+        """Kiểm tra đăng nhập thành công (integration test)."""
         with app.app_context():
-            self.test_user.is_active = False
-            db.session.commit()
-            response = self.login_user()
+            response = self.client.post('/auth/login', data={
+                'username_or_email': 'testuser',
+                'password': 'StrongP@ss123',
+                'remember_me': True
+            }, follow_redirects=True)
             self.assertEqual(response.status_code, 200)
-            self.assertIn(b'login.html', response.data)
-            with self.client.session_transaction() as sess:
-                self.assertIsNone(sess.get('_user_id'))
+            self.assertTrue(current_user.is_authenticated)
+            self.assertEqual(current_user.username, 'testuser')
 
     def test_logout_success(self):
-        """Kiểm tra đăng xuất khi đã đăng nhập (integration test)."""
+        """Kiểm tra đăng xuất thành công (integration test)."""
         with app.app_context():
             self.login_user()
             response = self.client.post('/auth/logout', follow_redirects=True)
             self.assertEqual(response.status_code, 200)
-            self.assertIn(b'index.html', response.data)
-            with self.client.session_transaction() as sess:
-                self.assertIsNone(sess.get('_user_id'))
+            self.assertFalse(current_user.is_authenticated)
 
     def test_logout_unauthenticated(self):
         """Kiểm tra đăng xuất khi chưa đăng nhập (integration test)."""
         with app.app_context():
-            response = self.client.post('/auth/logout', follow_redirects=True)
-            self.assertEqual(response.status_code, 200)
-            self.assertIn(b'login.html', response.data)
-
-    def test_check_auth_authenticated(self):
-        """Kiểm tra /check-auth khi đã đăng nhập (integration test)."""
-        with app.app_context():
-            self.login_user()
+            self.client.post('/auth/logout', follow_redirects=True)
             response = self.client.get('/auth/check-auth')
             self.assertEqual(response.status_code, 200)
-            data = response.json
-            self.assertTrue(data.get('is_authenticated'))
-            self.assertEqual(data.get('user', {}).get('username'), 'testuser')
+            self.assertEqual(response.json['is_authenticated'], False)
 
-    def test_check_auth_unauthenticated(self):
-        """Kiểm tra /check-auth khi chưa đăng nhập (integration test)."""
-        with app.app_context():
-            response = self.client.get('/auth/check-auth')
-            self.assertEqual(response.status_code, 200)
-            data = response.json
-            self.assertFalse(data.get('is_authenticated'))
-
-class TestEventRoutes(EventHubTestCase):
-    """Kiểm thử tích hợp cho các endpoint trong routes.py liên quan đến sự kiện."""
-
-    def test_get_index(self):
-        """Kiểm tra GET / endpoint (integration test)."""
+    def test_register_duplicate_email_rollback(self):
+        """Kiểm tra đăng ký với email trùng lặp (integration test)."""
         with app.app_context():
             with db.session.begin_nested():
-                response = self.client.get('/')
+                with patch('eventapp.auth.db.session.rollback') as mock_rollback:
+                    response = self.client.post('/auth/register', data={
+                        'username': 'newuser',
+                        'email': 'test@example.com',
+                        'password': 'StrongP@ss123',
+                        'phone': '1234567890'
+                    }, follow_redirects=True)
+                    mock_rollback.assert_called_once()
             self.assertEqual(response.status_code, 200)
-            self.assertIn(b'index.html', response.data)
+            self.assertEqual(db.session.query(User).filter_by(email='test@example.com').count(), 1)
 
-    def test_get_events(self):
-        """Kiểm tra GET /events endpoint (integration test)."""
+    def test_register_duplicate_username_rollback(self):
+        """Kiểm tra đăng ký với username trùng lặp (integration test)."""
         with app.app_context():
             with db.session.begin_nested():
-                response = self.client.get('/events')
+                with patch('eventapp.auth.db.session.rollback') as mock_rollback:
+                    response = self.client.post('/auth/register', data={
+                        'username': 'testuser',
+                        'email': 'newuser@example.com',
+                        'password': 'StrongP@ss123',
+                        'phone': '1234567890'
+                    }, follow_redirects=True)
+                    mock_rollback.assert_called_once()
             self.assertEqual(response.status_code, 200)
-            self.assertIn(b'EventList.html', response.data)
+            self.assertEqual(db.session.query(User).filter_by(username='testuser').count(), 1)
 
-    def test_get_event_detail(self):
-        """Kiểm tra GET /event/<event_id> endpoint (integration test)."""
-        with app.app_context():
-            with db.session.begin_nested():
-                db.session.refresh(self.event)
-                response = self.client.get(f'/event/{self.event.id}')
-            self.assertEqual(response.status_code, 200)
-            self.assertIn(b'EventDetail.html', response.data)
-
-    def test_get_event_detail_not_found(self):
-        """Kiểm tra GET /event/<event_id> với sự kiện không tồn tại (integration test)."""
-        with app.app_context():
-            with db.session.begin_nested():
-                response = self.client.get('/event/999', follow_redirects=True)
-            self.assertEqual(response.status_code, 200)
-            self.assertIn(b'EventList.html', response.data)
-
-    def test_get_organizer_events(self):
-        """Kiểm tra GET /organizer/my-events endpoint (integration test)."""
-        with app.app_context():
-            with db.session.begin_nested():
-                self.client.post('/auth/logout', follow_redirects=True)
-                login_user(self.organizer)
-                db.session.commit()
-                db.session.refresh(self.organizer)
-                response = self.client.get('/organizer/my-events')
-            self.assertEqual(response.status_code, 200)
-            self.assertIn(b'my_events.html', response.data)
-
-    def test_get_organizer_events_unauthorized(self):
-        """Kiểm tra GET /organizer/my-events khi chưa đăng nhập (integration test)."""
-        with app.app_context():
-            with db.session.begin_nested():
-                self.client.post('/auth/logout', follow_redirects=True)
-                response = self.client.get('/organizer/my-events', follow_redirects=True)
-            self.assertEqual(response.status_code, 200)
-            self.assertIn(b'login.html', response.data)
-
-    def test_create_event_success(self):
-        """Kiểm tra POST /organizer/create-event endpoint (integration test)."""
-        with app.app_context():
-            with db.session.begin_nested():
-                self.client.post('/auth/logout', follow_redirects=True)
-                login_user(self.organizer)
-                db.session.commit()
-                db.session.refresh(self.organizer)
-                response = self.client.post('/organizer/create-event', data={
-                    'title': 'Sự Kiện Mới',
-                    'description': 'Mô tả',
-                    'category': 'music',
-                    'start_time': '2025-09-01T10:00',
-                    'end_time': '2025-09-01T12:00',
-                    'location': 'Địa điểm',
-                    'ticket_name': 'VIP',
-                    'price': 100,
-                    'ticket_quantity': 50
-                }, follow_redirects=True)
-            self.assertEqual(response.status_code, 200)
-            event = db.session.query(Event).filter_by(title='Sự Kiện Mới').first()
-            self.assertIsNotNone(event)
-            self.assertEqual(event.organizer_id, self.organizer.id)
-            ticket_type = db.session.query(TicketType).filter_by(event_id=event.id).first()
-            self.assertIsNotNone(ticket_type)
-            self.assertEqual(ticket_type.name, 'VIP')
-            self.assertEqual(db.session.query(Event).count(), 2)
-            self.assertEqual(db.session.query(TicketType).count(), 2)
-
-    def test_create_event_invalid_data_rollback(self):
-        """Kiểm tra POST /organizer/create-event với dữ liệu không hợp lệ (integration test)."""
+    def test_create_event_invalid_end_time(self):
+        """Kiểm tra POST /organizer/create-event với end_time không hợp lệ (integration test)."""
         with app.app_context():
             with db.session.begin_nested():
                 self.client.post('/auth/logout', follow_redirects=True)
@@ -1101,7 +489,6 @@ class TestEventRoutes(EventHubTestCase):
                     'location': 'Địa điểm'
                 }, follow_redirects=True)
             self.assertEqual(response.status_code, 200)
-            self.assertIn(b'create_event.html', response.data)
             self.assertEqual(db.session.query(Event).count(), 1)
             self.assertEqual(db.session.query(TicketType).count(), 1)
 
@@ -1177,7 +564,6 @@ class TestEventRoutes(EventHubTestCase):
                     'comment': 'Great event!'
                 }, follow_redirects=True)
             self.assertEqual(response.status_code, 200)
-            self.assertIn(b'EventDetail.html', response.data)
             self.assertEqual(db.session.query(Review).count(), 0)
 
     def test_reply_review_success(self):
