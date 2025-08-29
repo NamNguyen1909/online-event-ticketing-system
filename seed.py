@@ -423,13 +423,11 @@ def seed_database():
         # Xóa bảng liên kết event_staff trước để tránh lỗi khóa ngoại
         db.session.execute(text('DELETE FROM event_staff;'))
         db.session.commit()
-        # Xóa từng bảng một cách an toàn
+        # Xóa từng bảng một cách an toàn (không cần SET FOREIGN_KEY_CHECKS cho PostgreSQL)
         UserNotification.query.delete()
         Notification.query.delete()
-        db.session.execute(text('SET FOREIGN_KEY_CHECKS=0;'))
         Review.query.delete()
         db.session.commit()
-        db.session.execute(text('SET FOREIGN_KEY_CHECKS=1;'))
         EventTrendingLog.query.delete()
         Ticket.query.delete()
         Payment.query.delete()
