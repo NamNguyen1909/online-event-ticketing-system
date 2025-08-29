@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - develop
+      - NamNguyen
   pull_request:
     branches:
       - main
@@ -24,8 +25,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          cd eventapp
-          pip install -r requirements.txt
+          pip install -r eventapp/requirements.txt
+          python seed.py
 
       - name: Set environment variables
         run: |
@@ -36,4 +37,6 @@ jobs:
 
       - name: Run tests
         run: |
-          PYTHONPATH=. pytest eventapp/tests --maxfail=1 --disable-warnings -q
+          # PYTHONPATH=. pytest eventapp/tests -v --disable-warnings
+          PYTHONPATH=. pytest eventapp/tests -v --disable-warnings --tb=short
+          # PYTHONPATH=. pytest eventapp/tests --maxfail=1 --disable-warnings -q
