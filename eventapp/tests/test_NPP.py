@@ -254,10 +254,12 @@ class TestDAOLayer(EventHubTestCase):
     @patch('eventapp.dao.Event.query')
     def test_delete_event_success(self, mock_query):
         """Kiểm tra delete_event với sự kiện và người dùng hợp lệ."""
-        mock_event = Event(id=1, organizer_id=self.test_user.id)
+        mock_event = Event(id=1, organizer_id=self.test_user.id, is_active=True)
         mock_query.get.return_value = mock_event
         result = delete_event(1, self.test_user.id)
-        self.assertTrue(result)
+        # Hàm delete_event không trả về giá trị, chỉ đặt is_active=False
+        self.assertIsNone(result)
+        self.assertFalse(mock_event.is_active)
 
     @patch('eventapp.dao.Event.query')
     def test_delete_event_unauthorized(self, mock_query):
