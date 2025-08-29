@@ -233,6 +233,7 @@ class TestDAOLayer(EventHubTestCase):
             'start_time': '2025-09-01T10:00',
             'end_time': '2025-09-01T12:00',
             'location': 'Địa điểm kiểm thử',
+            'poster': None,
             'ticket_types': [{'name': 'VIP', 'price': 100, 'total_quantity': 50}]
         }
         mock_session.add.return_value = None
