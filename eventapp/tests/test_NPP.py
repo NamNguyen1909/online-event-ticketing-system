@@ -16,7 +16,6 @@ from eventapp.dao import (
 from eventapp.auth import validate_email, validate_password
 from werkzeug.security import generate_password_hash
 from datetime import datetime, timedelta
-from eventapp.forms import ValidationError
 
 class EventHubTestCase(TestCase):
     """Lớp kiểm thử cơ bản cho ứng dụng EventHub với Flask test client."""
@@ -248,7 +247,7 @@ class TestDAOLayer(EventHubTestCase):
             {'name': 'VIP', 'price': 100, 'total_quantity': 50},
             {'name': 'VIP', 'price': 200, 'total_quantity': 30}
         ]
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(ValueError):
             validate_ticket_types(ticket_types)
 
     @patch('eventapp.dao.Event.query')
