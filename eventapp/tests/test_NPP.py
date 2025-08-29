@@ -16,6 +16,7 @@ from eventapp.dao import (
 from eventapp.auth import validate_email, validate_password
 from werkzeug.security import generate_password_hash
 from datetime import datetime, timedelta
+from eventapp.forms import ValidationError
 
 class EventHubTestCase(TestCase):
     """Lớp kiểm thử cơ bản cho ứng dụng EventHub với Flask test client."""
@@ -202,8 +203,30 @@ class TestDAOLayer(EventHubTestCase):
         self.assertFalse(result)
 
     @patch('eventapp.dao.db.session')
-    def test_create_event_with_tickets_success(self, mock_session):
-        """Kiểm tra create_event_with_tickets với dữ liệu hợp lệ."""
+    @patch('eventapp.dao.Event.upload_poster')
+    def test_create_event_with_tickets_with_poster(self, mock_upload_poster, mock_session):
+        """Kiểm tra create_event_with_tickets với dữ liệu hợp lệ có poster."""
+        data = {
+            'title': 'Sự Kiện Kiểm Thử',
+            'description': 'Mô tả',
+            'category': 'music',
+            'start_time': '2025-09-01T10:00',
+            'end_time': '2025-09-01T12:00',
+            'location': 'Địa điểm kiểm thử',
+            'poster': 'test_poster.jpg',
+            'ticket_types': [{'name': 'VIP', 'price': 100, 'total_quantity': 50}]
+        }
+        mock_session.add.return_value = None
+        mock_session.commit.return_value = None
+        mock_session.flush.return_value = None
+        mock_upload_poster.return_value = {'public_id': 'test_poster_id'}
+        result = create_event_with_tickets(data, self.test_user.id)
+        self.assertIsNotNone(result)
+        mock_upload_poster.assert_called_once_with('test_poster.jpg')
+
+    @patch('eventapp.dao.db.session')
+    def test_create_event_with_tickets_without_poster(self, mock_session):
+        """Kiểm tra create_event_with_tickets với dữ liệu hợp lệ không có poster."""
         data = {
             'title': 'Sự Kiện Kiểm Thử',
             'description': 'Mô tả',
@@ -215,6 +238,7 @@ class TestDAOLayer(EventHubTestCase):
         }
         mock_session.add.return_value = None
         mock_session.commit.return_value = None
+        mock_session.flush.return_value = None
         result = create_event_with_tickets(data, self.test_user.id)
         self.assertIsNotNone(result)
 
