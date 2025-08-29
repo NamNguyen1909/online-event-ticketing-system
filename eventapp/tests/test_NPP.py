@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch, MagicMock, PropertyMock
 from flask import Flask
 from flask_testing import TestCase
+from flask_login import login_user
 from eventapp import app, db
 from eventapp.models import User, UserRole, Event, TicketType, Review, EventCategory, Ticket, Payment
 from eventapp.dao import (
@@ -31,14 +32,12 @@ class EventHubTestCase(TestCase):
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
         app.config['SECRET_KEY'] = 'test_secret'
         app.config['WTF_CSRF_ENABLED'] = False
-        # Tăng timeout để tránh database locked
-        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'timeout': 30}}
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'timeout': 30, 'check_same_thread': False}}
         return app
 
     def create_user_and_commit(self, username, email, password, role=UserRole.customer, creator_id=None):
         """Helper để tạo và commit user, đảm bảo có ID hợp lệ."""
         with app.app_context():
-            # Kiểm tra email/username không trùng
             if db.session.query(User).filter_by(email=email).first():
                 email = f"{uuid.uuid4().hex[:8]}@{email.split('@')[1]}"
             if db.session.query(User).filter_by(username=username).first():
@@ -53,6 +52,7 @@ class EventHubTestCase(TestCase):
             )
             db.session.add(user)
             db.session.commit()
+            db.session.refresh(user)
             return user
 
     def create_event_and_commit(self, organizer_id, title='Sự Kiện Kiểm Thử', is_active=True):
@@ -70,6 +70,7 @@ class EventHubTestCase(TestCase):
             )
             db.session.add(event)
             db.session.commit()
+            db.session.refresh(event)
             return event
 
     def create_ticket_type_and_commit(self, event_id, name='VIP', price=100, total_quantity=50):
@@ -85,6 +86,7 @@ class EventHubTestCase(TestCase):
             )
             db.session.add(ticket_type)
             db.session.commit()
+            db.session.refresh(ticket_type)
             return ticket_type
 
     def create_ticket_and_commit(self, user_id, event_id, ticket_type_id):
@@ -100,6 +102,7 @@ class EventHubTestCase(TestCase):
             )
             db.session.add(ticket)
             db.session.commit()
+            db.session.refresh(ticket)
             return ticket
 
     def setUp(self):
@@ -108,7 +111,6 @@ class EventHubTestCase(TestCase):
             db.create_all()
             self.client = self.app.test_client()
 
-            # Bước 1: Tạo và commit dữ liệu cơ bản (User)
             self.test_user = self.create_user_and_commit(
                 username='testuser',
                 email='test@example.com',
@@ -129,18 +131,21 @@ class EventHubTestCase(TestCase):
                 creator_id=self.organizer.id
             )
 
-            # Bước 2: Tạo và commit dữ liệu phụ thuộc (Event, TicketType, Ticket)
             self.event = self.create_event_and_commit(self.organizer.id)
             self.ticket_type = self.create_ticket_type_and_commit(self.event.id)
             self.ticket = self.create_ticket_and_commit(self.test_user.id, self.event.id, self.ticket_type.id)
+
+            login_user(self.test_user)
+            db.session.commit()
 
     def tearDown(self):
         """Dọn dẹp cơ sở dữ liệu kiểm thử."""
         with app.app_context():
             try:
-                db.session.remove()  # Đóng session
-                db.drop_all()  # Xóa tất cả bảng
-                db.engine.dispose()  # Đóng kết nối database
+                self.client.post('/auth/logout', follow_redirects=True)
+                db.session.remove()
+                db.drop_all()
+                db.engine.dispose()
             except Exception as e:
                 print(f"Error in tearDown: {e}")
                 raise
@@ -148,6 +153,11 @@ class EventHubTestCase(TestCase):
     def login_user(self, username='testuser', password='StrongP@ss123'):
         """Hàm hỗ trợ đăng nhập người dùng."""
         with app.app_context():
+            user = db.session.query(User).filter_by(username=username).first()
+            if user:
+                login_user(user)
+                db.session.commit()
+                db.session.refresh(user)
             return self.client.post('/auth/login', data={
                 'username_or_email': username,
                 'password': password,
@@ -593,11 +603,11 @@ class TestDAOLayer(EventHubTestCase):
                 'location': 'Địa điểm kiểm thử',
                 'ticket_types': [{'name': 'VIP', 'price': 100, 'total_quantity': 50}]
             }
-            invalid_user = MagicMock(id=999)  # Không tồn tại trong DB
-            with pytest.raises(ValueError) as exc_info:  # Giả định hàm raise ValueError nếu organizer_id không hợp lệ
+            invalid_user = MagicMock(id=999)
+            with pytest.raises(ValueError) as exc_info:
                 with db.session.begin_nested():
                     create_event_with_tickets(invalid_user.id, data)
-            self.assertIn('User not found', str(exc_info.value))  # Điều chỉnh thông điệp lỗi theo thực tế
+            self.assertIn('User not found', str(exc_info.value))
             self.assertEqual(db.session.query(Event).count(), 1)
             self.assertEqual(db.session.query(TicketType).count(), 1)
 
@@ -994,61 +1004,76 @@ class TestEventRoutes(EventHubTestCase):
     def test_get_index(self):
         """Kiểm tra GET / endpoint (integration test)."""
         with app.app_context():
-            response = self.client.get('/')
+            with db.session.begin_nested():
+                response = self.client.get('/')
             self.assertEqual(response.status_code, 200)
             self.assertIn(b'index.html', response.data)
 
     def test_get_events(self):
         """Kiểm tra GET /events endpoint (integration test)."""
         with app.app_context():
-            response = self.client.get('/events')
+            with db.session.begin_nested():
+                response = self.client.get('/events')
             self.assertEqual(response.status_code, 200)
             self.assertIn(b'EventList.html', response.data)
 
     def test_get_event_detail(self):
         """Kiểm tra GET /event/<event_id> endpoint (integration test)."""
         with app.app_context():
-            response = self.client.get(f'/event/{self.event.id}')
+            with db.session.begin_nested():
+                db.session.refresh(self.event)
+                response = self.client.get(f'/event/{self.event.id}')
             self.assertEqual(response.status_code, 200)
             self.assertIn(b'EventDetail.html', response.data)
 
     def test_get_event_detail_not_found(self):
         """Kiểm tra GET /event/<event_id> với sự kiện không tồn tại (integration test)."""
         with app.app_context():
-            response = self.client.get('/event/999', follow_redirects=True)
+            with db.session.begin_nested():
+                response = self.client.get('/event/999', follow_redirects=True)
             self.assertEqual(response.status_code, 200)
             self.assertIn(b'EventList.html', response.data)
 
     def test_get_organizer_events(self):
         """Kiểm tra GET /organizer/my-events endpoint (integration test)."""
         with app.app_context():
-            self.login_organizer()
-            response = self.client.get('/organizer/my-events')
+            with db.session.begin_nested():
+                self.client.post('/auth/logout', follow_redirects=True)
+                login_user(self.organizer)
+                db.session.commit()
+                db.session.refresh(self.organizer)
+                response = self.client.get('/organizer/my-events')
             self.assertEqual(response.status_code, 200)
             self.assertIn(b'my_events.html', response.data)
 
     def test_get_organizer_events_unauthorized(self):
         """Kiểm tra GET /organizer/my-events khi chưa đăng nhập (integration test)."""
         with app.app_context():
-            response = self.client.get('/organizer/my-events', follow_redirects=True)
+            with db.session.begin_nested():
+                self.client.post('/auth/logout', follow_redirects=True)
+                response = self.client.get('/organizer/my-events', follow_redirects=True)
             self.assertEqual(response.status_code, 200)
             self.assertIn(b'login.html', response.data)
 
     def test_create_event_success(self):
         """Kiểm tra POST /organizer/create-event endpoint (integration test)."""
         with app.app_context():
-            self.login_organizer()
-            response = self.client.post('/organizer/create-event', data={
-                'title': 'Sự Kiện Mới',
-                'description': 'Mô tả',
-                'category': 'music',
-                'start_time': '2025-09-01T10:00',
-                'end_time': '2025-09-01T12:00',
-                'location': 'Địa điểm',
-                'ticket_name': 'VIP',
-                'price': 100,
-                'ticket_quantity': 50
-            }, follow_redirects=True)
+            with db.session.begin_nested():
+                self.client.post('/auth/logout', follow_redirects=True)
+                login_user(self.organizer)
+                db.session.commit()
+                db.session.refresh(self.organizer)
+                response = self.client.post('/organizer/create-event', data={
+                    'title': 'Sự Kiện Mới',
+                    'description': 'Mô tả',
+                    'category': 'music',
+                    'start_time': '2025-09-01T10:00',
+                    'end_time': '2025-09-01T12:00',
+                    'location': 'Địa điểm',
+                    'ticket_name': 'VIP',
+                    'price': 100,
+                    'ticket_quantity': 50
+                }, follow_redirects=True)
             self.assertEqual(response.status_code, 200)
             event = db.session.query(Event).filter_by(title='Sự Kiện Mới').first()
             self.assertIsNotNone(event)
@@ -1062,8 +1087,11 @@ class TestEventRoutes(EventHubTestCase):
     def test_create_event_invalid_data_rollback(self):
         """Kiểm tra POST /organizer/create-event với dữ liệu không hợp lệ (integration test)."""
         with app.app_context():
-            self.login_organizer()
             with db.session.begin_nested():
+                self.client.post('/auth/logout', follow_redirects=True)
+                login_user(self.organizer)
+                db.session.commit()
+                db.session.refresh(self.organizer)
                 response = self.client.post('/organizer/create-event', data={
                     'title': '',
                     'description': 'Mô tả',
@@ -1080,34 +1108,41 @@ class TestEventRoutes(EventHubTestCase):
     def test_create_event_integrity_error_rollback(self):
         """Kiểm tra POST /organizer/create-event khi gặp IntegrityError (integration test)."""
         with app.app_context():
-            self.login_organizer()
-            with patch('eventapp.routes.db.session.commit') as mock_commit:
-                mock_commit.side_effect = IntegrityError("Mock integrity error", None, None)
-                with patch('eventapp.routes.db.session.rollback') as mock_rollback:
-                    response = self.client.post('/organizer/create-event', data={
-                        'title': 'Sự Kiện Mới',
-                        'description': 'Mô tả',
-                        'category': 'music',
-                        'start_time': '2025-09-01T10:00',
-                        'end_time': '2025-09-01T12:00',
-                        'location': 'Địa điểm',
-                        'ticket_name': 'VIP',
-                        'price': 100,
-                        'ticket_quantity': 50
-                    }, follow_redirects=True)
-                    self.assertEqual(response.status_code, 200)
-                    mock_rollback.assert_called_once()
-                    self.assertEqual(db.session.query(Event).count(), 1)
-                    self.assertEqual(db.session.query(TicketType).count(), 1)
+            with db.session.begin_nested():
+                self.client.post('/auth/logout', follow_redirects=True)
+                login_user(self.organizer)
+                db.session.commit()
+                db.session.refresh(self.organizer)
+                with patch('eventapp.routes.db.session.commit') as mock_commit:
+                    mock_commit.side_effect = IntegrityError("Mock integrity error", None, None)
+                    with patch('eventapp.routes.db.session.rollback') as mock_rollback:
+                        response = self.client.post('/organizer/create-event', data={
+                            'title': 'Sự Kiện Mới',
+                            'description': 'Mô tả',
+                            'category': 'music',
+                            'start_time': '2025-09-01T10:00',
+                            'end_time': '2025-09-01T12:00',
+                            'location': 'Địa điểm',
+                            'ticket_name': 'VIP',
+                            'price': 100,
+                            'ticket_quantity': 50
+                        }, follow_redirects=True)
+                        mock_rollback.assert_called_once()
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(db.session.query(Event).count(), 1)
+            self.assertEqual(db.session.query(TicketType).count(), 1)
 
     def test_add_review_success(self):
         """Kiểm tra POST /event/<event_id>/review với dữ liệu hợp lệ (integration test)."""
         with app.app_context():
-            self.login_user()
-            response = self.client.post(f'/event/{self.event.id}/review', data={
-                'rating': 4,
-                'comment': 'Great event!'
-            }, follow_redirects=True)
+            with db.session.begin_nested():
+                db.session.refresh(self.test_user)
+                login_user(self.test_user)
+                db.session.commit()
+                response = self.client.post(f'/event/{self.event.id}/review', data={
+                    'rating': 4,
+                    'comment': 'Great event!'
+                }, follow_redirects=True)
             self.assertEqual(response.status_code, 200)
             review = db.session.query(Review).filter_by(event_id=self.event.id, user_id=self.test_user.id).first()
             self.assertIsNotNone(review)
@@ -1118,19 +1153,25 @@ class TestEventRoutes(EventHubTestCase):
     def test_add_review_unauthorized(self):
         """Kiểm tra POST /event/<event_id>/review khi không có quyền (integration test)."""
         with app.app_context():
-            self.login_organizer()
-            response = self.client.post(f'/event/{self.event.id}/review', data={
-                'rating': 4,
-                'comment': 'Great event!'
-            }, follow_redirects=True)
+            with db.session.begin_nested():
+                self.client.post('/auth/logout', follow_redirects=True)
+                login_user(self.organizer)
+                db.session.commit()
+                db.session.refresh(self.organizer)
+                response = self.client.post(f'/event/{self.event.id}/review', data={
+                    'rating': 4,
+                    'comment': 'Great event!'
+                }, follow_redirects=True)
             self.assertEqual(response.status_code, 403)
             self.assertEqual(db.session.query(Review).count(), 0)
 
     def test_add_review_invalid_rating_rollback(self):
         """Kiểm tra POST /event/<event_id>/review với rating không hợp lệ (integration test)."""
         with app.app_context():
-            self.login_user()
             with db.session.begin_nested():
+                db.session.refresh(self.test_user)
+                login_user(self.test_user)
+                db.session.commit()
                 response = self.client.post(f'/event/{self.event.id}/review', data={
                     'rating': 6,
                     'comment': 'Great event!'
@@ -1142,18 +1183,22 @@ class TestEventRoutes(EventHubTestCase):
     def test_reply_review_success(self):
         """Kiểm tra POST /review/<review_id>/reply với dữ liệu hợp lệ (integration test)."""
         with app.app_context():
-            review = Review(
-                event_id=self.event.id,
-                user_id=self.test_user.id,
-                rating=4,
-                comment='Great event!'
-            )
-            db.session.add(review)
-            db.session.commit()
-            self.login_organizer()
-            response = self.client.post(f'/review/{review.id}/reply', data={
-                'reply_content': 'Thank you for your review!'
-            }, follow_redirects=True)
+            with db.session.begin_nested():
+                review = Review(
+                    event_id=self.event.id,
+                    user_id=self.test_user.id,
+                    rating=4,
+                    comment='Great event!'
+                )
+                db.session.add(review)
+                db.session.commit()
+                self.client.post('/auth/logout', follow_redirects=True)
+                login_user(self.organizer)
+                db.session.commit()
+                db.session.refresh(self.organizer)
+                response = self.client.post(f'/review/{review.id}/reply', data={
+                    'reply_content': 'Thank you for your review!'
+                }, follow_redirects=True)
             self.assertEqual(response.status_code, 200)
             reply = db.session.query(Review).filter_by(parent_review_id=review.id).first()
             self.assertIsNotNone(reply)
@@ -1163,33 +1208,39 @@ class TestEventRoutes(EventHubTestCase):
     def test_reply_review_unauthorized(self):
         """Kiểm tra POST /review/<review_id>/reply khi không có quyền (integration test)."""
         with app.app_context():
-            review = Review(
-                event_id=self.event.id,
-                user_id=self.test_user.id,
-                rating=4,
-                comment='Great event!'
-            )
-            db.session.add(review)
-            db.session.commit()
-            self.login_user()
-            response = self.client.post(f'/review/{review.id}/reply', data={
-                'reply_content': 'Invalid reply'
-            }, follow_redirects=True)
+            with db.session.begin_nested():
+                review = Review(
+                    event_id=self.event.id,
+                    user_id=self.test_user.id,
+                    rating=4,
+                    comment='Great event!'
+                )
+                db.session.add(review)
+                db.session.commit()
+                db.session.refresh(self.test_user)
+                login_user(self.test_user)
+                db.session.commit()
+                response = self.client.post(f'/review/{review.id}/reply', data={
+                    'reply_content': 'Invalid reply'
+                }, follow_redirects=True)
             self.assertEqual(response.status_code, 403)
             self.assertEqual(db.session.query(Review).count(), 1)
 
     def test_process_booking_success(self):
         """Kiểm tra POST /booking/process với dữ liệu hợp lệ (integration test)."""
         with app.app_context():
-            self.login_user()
-            response = self.client.post('/booking/process', json={
-                'event_id': self.event.id,
-                'tickets': [{'ticket_type_id': self.ticket_type.id, 'quantity': 2}],
-                'payment_method': 'cod',
-                'subtotal': 200,
-                'discount_amount': 0,
-                'total_amount': 200
-            })
+            with db.session.begin_nested():
+                db.session.refresh(self.test_user)
+                login_user(self.test_user)
+                db.session.commit()
+                response = self.client.post('/booking/process', json={
+                    'event_id': self.event.id,
+                    'tickets': [{'ticket_type_id': self.ticket_type.id, 'quantity': 2}],
+                    'payment_method': 'cod',
+                    'subtotal': 200,
+                    'discount_amount': 0,
+                    'total_amount': 200
+                })
             self.assertEqual(response.status_code, 200)
             data = response.json
             self.assertTrue(data.get('success'))
@@ -1201,8 +1252,10 @@ class TestEventRoutes(EventHubTestCase):
     def test_process_booking_no_tickets_rollback(self):
         """Kiểm tra POST /booking/process khi không chọn vé (integration test)."""
         with app.app_context():
-            self.login_user()
             with db.session.begin_nested():
+                db.session.refresh(self.test_user)
+                login_user(self.test_user)
+                db.session.commit()
                 response = self.client.post('/booking/process', json={
                     'event_id': self.event.id,
                     'tickets': [],
@@ -1218,8 +1271,10 @@ class TestEventRoutes(EventHubTestCase):
     def test_process_booking_invalid_tickets_rollback(self):
         """Kiểm tra POST /booking/process với số lượng vé vượt quá tồn kho (integration test)."""
         with app.app_context():
-            self.login_user()
             with db.session.begin_nested():
+                db.session.refresh(self.test_user)
+                login_user(self.test_user)
+                db.session.commit()
                 response = self.client.post('/booking/process', json={
                     'event_id': self.event.id,
                     'tickets': [{'ticket_type_id': self.ticket_type.id, 'quantity': 100}],
@@ -1235,10 +1290,14 @@ class TestEventRoutes(EventHubTestCase):
     def test_staff_scan_ticket_success(self):
         """Kiểm tra POST /staff/scan-ticket với vé hợp lệ (integration test)."""
         with app.app_context():
-            self.login_staff()
-            response = self.client.post('/staff/scan-ticket', json={
-                'qr_data': self.ticket.uuid
-            })
+            with db.session.begin_nested():
+                self.client.post('/auth/logout', follow_redirects=True)
+                login_user(self.staff)
+                db.session.commit()
+                db.session.refresh(self.staff)
+                response = self.client.post('/staff/scan-ticket', json={
+                    'qr_data': self.ticket.uuid
+                })
             self.assertEqual(response.status_code, 200)
             data = response.json
             self.assertTrue(data.get('success'))
@@ -1249,10 +1308,14 @@ class TestEventRoutes(EventHubTestCase):
     def test_staff_scan_ticket_invalid(self):
         """Kiểm tra POST /staff/scan-ticket với vé không hợp lệ (integration test)."""
         with app.app_context():
-            self.login_staff()
-            response = self.client.post('/staff/scan-ticket', json={
-                'qr_data': 'invalid_uuid'
-            })
+            with db.session.begin_nested():
+                self.client.post('/auth/logout', follow_redirects=True)
+                login_user(self.staff)
+                db.session.commit()
+                db.session.refresh(self.staff)
+                response = self.client.post('/staff/scan-ticket', json={
+                    'qr_data': 'invalid_uuid'
+                })
             self.assertEqual(response.status_code, 404)
             data = response.json
             self.assertFalse(data.get('success'))
