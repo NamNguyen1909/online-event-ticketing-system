@@ -27,6 +27,7 @@ jobs:
           pip install --upgrade pip
           cd eventapp
           pip install -r requirements.txt
+          python seed.py
 
       - name: Set environment variables
         run: |
