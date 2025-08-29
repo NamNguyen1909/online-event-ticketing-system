@@ -266,8 +266,9 @@ class TestDAOLayer(EventHubTestCase):
         """Kiểm tra delete_event với người dùng không có quyền."""
         mock_event = Event(id=1, organizer_id=999)
         mock_query.get.return_value = mock_event
-        result = delete_event(1, self.test_user.id)
-        self.assertFalse(result)
+        with self.assertRaises(ValueError) as context:
+            delete_event(1, self.test_user.id)
+        self.assertEqual(str(context.exception), 'Event not found or not owned by user')
 
     @patch('eventapp.dao.User.query')
     def test_get_staff_by_organizer_success(self, mock_query):
