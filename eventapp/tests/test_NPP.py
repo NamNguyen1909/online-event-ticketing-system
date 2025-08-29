@@ -274,7 +274,7 @@ class TestDAOLayer(EventHubTestCase):
     def test_get_staff_by_organizer_success(self, mock_query):
         """Kiểm tra get_staff_by_organizer với nhân viên hợp lệ."""
         mock_staff = User(role=UserRole.staff, creator_id=self.test_user.id)
-        mock_query.filter.return_value.filter.return_value.all.return_value = [mock_staff]
+        mock_query.filter.return_value.all.return_value = [mock_staff]
         result = get_staff_by_organizer(self.test_user.id)
         self.assertEqual(len(result), 1)
 
@@ -282,7 +282,7 @@ class TestDAOLayer(EventHubTestCase):
     def test_get_customers_for_upgrade_success(self, mock_query):
         """Kiểm tra get_customers_for_upgrade với khách hàng hợp lệ."""
         mock_customer = User(role=UserRole.customer, creator_id=None)
-        mock_query.filter.return_value.filter.return_value.all.return_value = [mock_customer]
+        mock_query.filter.return_value.all.return_value = [mock_customer]
         result = get_customers_for_upgrade()
         self.assertEqual(len(result), 1)
 
