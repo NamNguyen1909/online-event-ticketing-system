@@ -310,7 +310,7 @@ class TestRoutesIntegration(EventHubTestCase):
                 'ticket_quantity': '100'
             }, follow_redirects=True)
             self.assertEqual(response.status_code, 200)
-            self.assertIn(b'Tạo sự kiện thành công!', response.data)
+            self.assertIn('Tạo sự kiện thành công!'.encode('utf-8'), response.data)
             event = db.session.query(Event).filter_by(title='Startup Pitch').first()
             self.assertIsNotNone(event)
             self.assertEqual(len(event.ticket_types), 1)
