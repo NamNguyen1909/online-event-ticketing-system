@@ -85,7 +85,8 @@ class EventHubTestCase(TestCase):
     def setUp(self):
         """Set up test database and environment."""
         with app.app_context():
-            db.create_all()  # Ensure all tables (including tickets) are created
+            db.drop_all()  # Ensure clean database before each test
+            db.create_all()  # Create all tables
             self.client = self.app.test_client()
 
             # Create test users
@@ -194,45 +195,35 @@ class TestDAOLayer(EventHubTestCase):
     @patch('eventapp.dao.db.session')
     def test_create_event_with_tickets(self, mock_db_session):
         """Test create_event_with_tickets with valid data."""
+        # Note: dao.py expects single ticket fields (ticket_name, price, ticket_quantity),
+        # not a ticket_types array, based on provided dao.py implementation
         data = {
             'title': 'Music Night',
             'description': 'Live music show',
             'category': 'music',
-            'start_time': '2025-09-01T19:00',
-            'end_time': '2025-09-01T22:00',
+            'start_time': '2025-09-01T19:00:00',
+            'end_time': '2025-09-01T22:00:00',
             'location': 'Hanoi Opera House',
             'poster': None,
-            'ticket_types': [
-                {'name': 'VIP', 'price': 1000000, 'total_quantity': 50},
-                {'name': 'Standard', 'price': 300000, 'total_quantity': 200}
-            ]
+            'ticket_name': 'VIP',
+            'price': 1000000,
+            'ticket_quantity': 50
         }
-        # Mock event and ticket types
         mock_event = MagicMock(id=1, title='Music Night', organizer_id=2)
-        mock_ticket_type1 = MagicMock()
-        mock_ticket_type1.name = 'VIP'
-        mock_ticket_type1.price = 1000000
-        mock_ticket_type1.total_quantity = 50
-        mock_ticket_type2 = MagicMock()
-        mock_ticket_type2.name = 'Standard'
-        mock_ticket_type2.price = 300000
-        mock_ticket_type2.total_quantity = 200
-        mock_event.ticket_types = [mock_ticket_type1, mock_ticket_type2]
-        mock_db_session.add.side_effect = lambda x: None  # Simulate adding to session
-        mock_db_session.commit.return_value = None  # Simulate commit
-        # Mock the creation process
+        mock_ticket_type = MagicMock(name='VIP', price=1000000, total_quantity=50)
+        mock_event.ticket_types = [mock_ticket_type]
+        mock_db_session.add.side_effect = lambda x: None
+        mock_db_session.flush.return_value = None
+        mock_db_session.commit.return_value = None
         with patch('eventapp.dao.Event', return_value=mock_event):
-            with patch('eventapp.dao.TicketType', side_effect=[mock_ticket_type1, mock_ticket_type2]):
+            with patch('eventapp.dao.TicketType', return_value=mock_ticket_type):
                 event = create_event_with_tickets(data, 2)
         self.assertIsNotNone(event)
         self.assertEqual(event.title, 'Music Night')
-        self.assertEqual(len(event.ticket_types), 2)
+        self.assertEqual(len(event.ticket_types), 1)
         self.assertEqual(event.ticket_types[0].name, 'VIP')
         self.assertEqual(event.ticket_types[0].price, 1000000)
         self.assertEqual(event.ticket_types[0].total_quantity, 50)
-        self.assertEqual(event.ticket_types[1].name, 'Standard')
-        self.assertEqual(event.ticket_types[1].price, 300000)
-        self.assertEqual(event.ticket_types[1].total_quantity, 200)
         mock_db_session.add.assert_called()
         mock_db_session.commit.assert_called_once()
 
@@ -240,41 +231,32 @@ class TestDAOLayer(EventHubTestCase):
     @patch('eventapp.dao.db.session')
     def test_update_event_with_tickets(self, mock_db_session, mock_query):
         """Test update_event_with_tickets with event_id 15."""
+        # Note: dao.py expects single ticket fields (ticket_name, price, ticket_quantity),
+        # not a ticket_types array, based on provided dao.py implementation
         mock_event = MagicMock(id=15, organizer_id=2)
-        mock_ticket_type1 = MagicMock()
-        mock_ticket_type1.name = 'VIP'
-        mock_ticket_type1.price = 1000000
-        mock_ticket_type1.total_quantity = 50
-        mock_ticket_type2 = MagicMock()
-        mock_ticket_type2.name = 'Student'
-        mock_ticket_type2.price = 200000
-        mock_ticket_type2.total_quantity = 100
-        mock_event.ticket_types = [mock_ticket_type1, mock_ticket_type2]
-        mock_query.get.return_value = mock_event
+        mock_ticket_type = MagicMock(name='VIP', price=1000000, total_quantity=50)
+        mock_event.ticket_types = [mock_ticket_type]
+        mock_query.filter_by.return_value.first.return_value = mock_event
         data = {
             'title': 'Updated Conference',
             'description': 'Updated description',
             'category': 'music',
-            'start_time': '2025-09-01T19:00',
-            'end_time': '2025-09-01T22:00',
+            'start_time': '2025-09-01T19:00:00',
+            'end_time': '2025-09-01T22:00:00',
             'location': 'Hanoi',
-            'ticket_types': [
-                {'name': 'VIP', 'price': 1000000, 'total_quantity': 50},
-                {'name': 'Student', 'price': 200000, 'total_quantity': 100}
-            ]
+            'ticket_name': 'VIP',
+            'price': 1000000,
+            'ticket_quantity': 50
         }
-        with patch('eventapp.dao.TicketType', side_effect=[mock_ticket_type1, mock_ticket_type2]):
+        with patch('eventapp.dao.TicketType', return_value=mock_ticket_type):
             result = update_event_with_tickets(15, data, 2)
         self.assertEqual(result, mock_event)
         self.assertEqual(mock_event.title, 'Updated Conference')
-        self.assertEqual(len(mock_event.ticket_types), 2)
+        self.assertEqual(len(mock_event.ticket_types), 1)
         self.assertEqual(mock_event.ticket_types[0].name, 'VIP')
         self.assertEqual(mock_event.ticket_types[0].price, 1000000)
         self.assertEqual(mock_event.ticket_types[0].total_quantity, 50)
-        self.assertEqual(mock_event.ticket_types[1].name, 'Student')
-        self.assertEqual(mock_event.ticket_types[1].price, 200000)
-        self.assertEqual(mock_event.ticket_types[1].total_quantity, 100)
-        mock_query.get.assert_called_once_with(15)
+        mock_query.filter_by.assert_called_once_with(id=15, organizer_id=2)
         mock_db_session.commit.assert_called_once()
 
     @patch('eventapp.dao.Event.query')
@@ -289,23 +271,35 @@ class TestDAOLayer(EventHubTestCase):
     def test_bulk_delete_events(self):
         """Test bulk_delete_events with event_ids [21, 23]."""
         with app.app_context():
-            result = bulk_delete_events([21, 23], self.organizer.id)
+            event_21 = db.session.query(Event).get(self.event_21.id)
+            event_23 = db.session.query(Event).get(self.event_23.id)
+            self.assertIsNotNone(event_21)
+            self.assertIsNotNone(event_23)
+            self.assertEqual(event_21.organizer_id, self.organizer.id)
+            self.assertEqual(event_23.organizer_id, self.organizer.id)
+            result = bulk_delete_events([self.event_21.id, self.event_23.id], self.organizer.id)
             self.assertTrue(result)
-            event_21 = db.session.query(Event).get(21)
-            event_23 = db.session.query(Event).get(23)
+            event_21 = db.session.query(Event).get(self.event_21.id)
+            event_23 = db.session.query(Event).get(self.event_23.id)
             self.assertFalse(event_21.is_active)
             self.assertFalse(event_23.is_active)
 
     def test_bulk_delete_events_with_invalid_id(self):
         """Test bulk_delete_events with some invalid or unauthorized event IDs."""
         with app.app_context():
-            result = bulk_delete_events([21, 22, 999], self.organizer.id)
+            event_21 = db.session.query(Event).get(self.event_21.id)
+            event_22 = db.session.query(Event).get(self.event_22.id)
+            self.assertIsNotNone(event_21)
+            self.assertIsNotNone(event_22)
+            self.assertEqual(event_21.organizer_id, self.organizer.id)
+            self.assertEqual(event_22.organizer_id, self.other_organizer.id)
+            result = bulk_delete_events([self.event_21.id, self.event_22.id, 999], self.organizer.id)
             self.assertTrue(result)
-            event_21 = db.session.query(Event).get(21)
-            event_22 = db.session.query(Event).get(22)
-            self.assertFalse(event_21.is_active)  # Authorized event
-            self.assertTrue(event_22.is_active)   # Unauthorized event
-            self.assertIsNone(db.session.query(Event).get(999))  # Non-existent event
+            event_21 = db.session.query(Event).get(self.event_21.id)
+            event_22 = db.session.query(Event).get(self.event_22.id)
+            self.assertFalse(event_21.is_active)
+            self.assertTrue(event_22.is_active)
+            self.assertIsNone(db.session.query(Event).get(999))
 
     def test_validate_ticket_types(self):
         """Test validate_ticket_types with valid ticket types."""
@@ -321,17 +315,19 @@ class TestDAOLayer(EventHubTestCase):
         """Test update_user_role with user_id 7."""
         mock_user = MagicMock(id=7, role=UserRole.customer)
         mock_query.get.return_value = mock_user
-        update_user_role(7, UserRole.organizer, None)
-        self.assertEqual(mock_user.role, UserRole.organizer)
+        update_user_role(7, UserRole.staff, 2)
+        self.assertEqual(mock_user.role, UserRole.staff)
+        self.assertEqual(mock_user.creator_id, 2)
         mock_query.get.assert_called_once_with(7)
 
     @patch('eventapp.dao.User.query')
-    def test_update_user_role_invalid_role(self):
+    def test_update_user_role_invalid_role(self, mock_query):
         """Test update_user_role with invalid role."""
         mock_user = MagicMock(id=7, role=UserRole.customer)
         mock_query.get.return_value = mock_user
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as context:
             update_user_role(7, "invalid_role", None)
+        self.assertEqual(str(context.exception), "Vai trò không hợp lệ")
 
 class TestRoutesIntegration(EventHubTestCase):
     """Integration tests for routes in routes.py."""
@@ -348,24 +344,42 @@ class TestRoutesIntegration(EventHubTestCase):
                 'end_time': '2025-09-01T12:00:00',
                 'location': 'Hanoi',
                 'ticket_name': 'Standard',
-                'price': 200000,
-                'ticket_quantity': 100
+                'price': '200000.00',  # Matches CreateEventForm DecimalField
+                'ticket_quantity': '100'
             }, follow_redirects=True)
             self.assertEqual(response.status_code, 200)
-            self.assertIn('Tạo sự kiện thành công!'.encode('utf-8'), response.data)
-            event = db.session.query(Event).filter_by(title='Startup Pitch').first()
-            self.assertIsNotNone(event)
-            self.assertEqual(len(event.ticket_types), 1)
+            # Force session sync
+            self.client.get('/')
+            # Check flash messages
+            with self.client.session_transaction() as session:
+                flashes = session.get('_flashes', [])
+                if not any('Tạo sự kiện thành công!' in flash[1] for flash in flashes):
+                    from eventapp.routes import CreateEventForm
+                    form = CreateEventForm(formdata=request.form)
+                    print(f"Session contents: {session}")
+                    print(f"Flash messages: {flashes}")
+                    print(f"Form errors: {form.errors}")
+                    print(f"Response data: {response.data.decode('utf-8')[:1000]}")
+                self.assertTrue(any('Tạo sự kiện thành công!' in flash[1] for flash in flashes),
+                               f"Flash message 'Tạo sự kiện thành công!' not found. Got: {flashes}")
+            # Refresh database state
+            db.session.commit()
+            event = db.session.query(Event).filter_by(title='Startup Pitch', organizer_id=self.organizer.id).first()
+            self.assertIsNotNone(event, "Event not created in database")
+            db.session.refresh(event)
+            self.assertEqual(event.title, 'Startup Pitch', "Event title mismatch")
             ticket = db.session.query(TicketType).filter_by(event_id=event.id, name='Standard').first()
-            self.assertEqual(ticket.price, 200000)
+            self.assertIsNotNone(ticket, "Ticket type not created")
+            db.session.refresh(ticket)
+            self.assertEqual(float(ticket.price), 200000.00, "Ticket price mismatch")
 
     def test_post_organizer_update_event(self):
         """Test POST /organizer/update-event/<id> with valid data."""
         with app.app_context():
-            # Create event for testing
             event = self.create_event_and_commit(self.organizer.id, title='Old Title')
-            event_id = event.id  # Use the auto-generated ID
+            event_id = event.id
             self.create_ticket_type_and_commit(event_id, name='Old Ticket', price=100000, total_quantity=50)
+            self.assertEqual(event.organizer_id, self.organizer.id, "Event organizer mismatch")
             self.login_user('organizer', 'Password@123')
             response = self.client.post(f'/organizer/update-event/{event_id}', data={
                 'title': 'Updated Title',
@@ -375,15 +389,34 @@ class TestRoutesIntegration(EventHubTestCase):
                 'end_time': '2025-09-01T12:00:00',
                 'location': 'Hanoi',
                 'ticket_name': 'VIP',
-                'price': 800000,
-                'ticket_quantity': 50
+                'price': '800000.00',  # Matches UpdateEventForm DecimalField
+                'ticket_quantity': '50'
             }, follow_redirects=True)
             self.assertEqual(response.status_code, 200)
+            # Force session sync
+            self.client.get('/')
+            # Check flash messages
+            with self.client.session_transaction() as session:
+                flashes = session.get('_flashes', [])
+                if not any('Cập nhật sự kiện thành công!' in flash[1] for flash in flashes):
+                    from eventapp.routes import UpdateEventForm
+                    form = UpdateEventForm(formdata=request.form)
+                    print(f"Session contents: {session}")
+                    print(f"Flash messages: {flashes}")
+                    print(f"Form errors: {form.errors}")
+                    print(f"Response data: {response.data.decode('utf-8')[:1000]}")
+                self.assertTrue(any('Cập nhật sự kiện thành công!' in flash[1] for flash in flashes),
+                               f"Flash message 'Cập nhật sự kiện thành công!' not found. Got: {flashes}")
+            # Refresh database state
+            db.session.commit()
             event = db.session.query(Event).get(event_id)
-            self.assertEqual(event.title, 'Updated Title')
+            self.assertIsNotNone(event, "Event not found after update")
+            db.session.refresh(event)
+            self.assertEqual(event.title, 'Updated Title', "Event title not updated")
             ticket = db.session.query(TicketType).filter_by(event_id=event_id, name='VIP').first()
-            self.assertIsNotNone(ticket)
-            self.assertEqual(ticket.price, 800000)
+            self.assertIsNotNone(ticket, "Ticket type not updated")
+            db.session.refresh(ticket)
+            self.assertEqual(float(ticket.price), 800000.00, "Ticket price mismatch")
 
     def test_post_organizer_delete_event(self):
         """Test POST /organizer/delete-event/18."""
@@ -415,7 +448,7 @@ class TestRoutesIntegration(EventHubTestCase):
     def test_get_event_detail(self):
         """Test GET /event/30."""
         with app.app_context():
-            self.login_user('organizer', 'Password@123')  # Login to avoid redirect
+            self.login_user('organizer', 'Password@123')
             response = self.client.get(f'/event/{self.event_30.id}', follow_redirects=True)
             self.assertEqual(response.status_code, 200)
             self.assertIn(b'Event 30', response.data)
