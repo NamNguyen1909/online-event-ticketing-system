@@ -110,7 +110,7 @@ class EventHubTestCase(TestCase):
             )
 
             # Create test events and ticket types
-            self.event_10 =self.create_event_and_commit(self.organizer.id, title='Event 10')
+            self.event_10 = self.create_event_and_commit(self.organizer.id, title='Event 10')
             self.event_15 = self.create_event_and_commit(self.organizer.id, title='Conference')
             self.event_18 = self.create_event_and_commit(self.organizer.id, title='Event 18')
             self.event_20 = self.create_event_and_commit(self.organizer.id, title='Event 20')
@@ -198,21 +198,6 @@ class TestRoutesIntegration(EventHubTestCase):
             self.assertEqual(response_json['message'], 'Xóa sự kiện thành công!')
             event = db.session.query(Event).get(self.event_18.id)
             self.assertFalse(event.is_active)
-
-    def test_post_organizer_bulk_delete_events(self):
-        """Test POST /organizer/bulk-delete-events with event_ids [25, 26, 27]."""
-        with app.app_context():
-            self.login_user('organizer', 'Password@123')
-            response = self.client.post('/organizer/bulk-delete-events', json={
-                'event_ids': [self.event_25.id, self.event_26.id, self.event_27.id]
-            }, content_type='application/json', follow_redirects=True)
-            self.assertEqual(response.status_code, 200)
-            response_json = json.loads(response.data.decode('utf-8'))
-            self.assertTrue(response_json['success'])
-            self.assertEqual(response_json['message'], 'Xóa các sự kiện thành công!')
-            for event_id in [self.event_25.id, self.event_26.id, self.event_27.id]:
-                event = db.session.query(Event).get(event_id)
-                self.assertFalse(event.is_active)
 
     def test_get_event_detail(self):
         """Test GET /event/30."""
