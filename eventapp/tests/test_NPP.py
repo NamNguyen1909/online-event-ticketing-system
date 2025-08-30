@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from flask import Flask
+from flask import Flask, request
 from flask_testing import TestCase
 from flask_login import login_user, current_user
 from eventapp import app, db
@@ -195,8 +195,6 @@ class TestDAOLayer(EventHubTestCase):
     @patch('eventapp.dao.db.session')
     def test_create_event_with_tickets(self, mock_db_session):
         """Test create_event_with_tickets with valid data."""
-        # Note: dao.py expects single ticket fields (ticket_name, price, ticket_quantity),
-        # not a ticket_types array, based on provided dao.py implementation
         data = {
             'title': 'Music Night',
             'description': 'Live music show',
@@ -205,9 +203,11 @@ class TestDAOLayer(EventHubTestCase):
             'end_time': '2025-09-01T22:00:00',
             'location': 'Hanoi Opera House',
             'poster': None,
-            'ticket_name': 'VIP',
-            'price': 1000000,
-            'ticket_quantity': 50
+            'ticket_types': [{
+                'name': 'VIP',
+                'price': 1000000,
+                'total_quantity': 50
+            }]
         }
         mock_event = MagicMock(id=1, title='Music Night', organizer_id=2)
         mock_ticket_type = MagicMock(name='VIP', price=1000000, total_quantity=50)
@@ -231,8 +231,6 @@ class TestDAOLayer(EventHubTestCase):
     @patch('eventapp.dao.db.session')
     def test_update_event_with_tickets(self, mock_db_session, mock_query):
         """Test update_event_with_tickets with event_id 15."""
-        # Note: dao.py expects single ticket fields (ticket_name, price, ticket_quantity),
-        # not a ticket_types array, based on provided dao.py implementation
         mock_event = MagicMock(id=15, organizer_id=2)
         mock_ticket_type = MagicMock(name='VIP', price=1000000, total_quantity=50)
         mock_event.ticket_types = [mock_ticket_type]
@@ -244,9 +242,11 @@ class TestDAOLayer(EventHubTestCase):
             'start_time': '2025-09-01T19:00:00',
             'end_time': '2025-09-01T22:00:00',
             'location': 'Hanoi',
-            'ticket_name': 'VIP',
-            'price': 1000000,
-            'ticket_quantity': 50
+            'ticket_types': [{
+                'name': 'VIP',
+                'price': 1000000,
+                'total_quantity': 50
+            }]
         }
         with patch('eventapp.dao.TicketType', return_value=mock_ticket_type):
             result = update_event_with_tickets(15, data, 2)
@@ -293,8 +293,11 @@ class TestDAOLayer(EventHubTestCase):
             self.assertIsNotNone(event_22)
             self.assertEqual(event_21.organizer_id, self.organizer.id)
             self.assertEqual(event_22.organizer_id, self.other_organizer.id)
+            
+            # Ensure that the invalid event ID does not cause an exception
             result = bulk_delete_events([self.event_21.id, self.event_22.id, 999], self.organizer.id)
             self.assertTrue(result)
+            
             event_21 = db.session.query(Event).get(self.event_21.id)
             event_22 = db.session.query(Event).get(self.event_22.id)
             self.assertFalse(event_21.is_active)
@@ -315,7 +318,7 @@ class TestDAOLayer(EventHubTestCase):
         """Test update_user_role with user_id 7."""
         mock_user = MagicMock(id=7, role=UserRole.customer)
         mock_query.get.return_value = mock_user
-        update_user_role(7, UserRole.staff, 2)
+        update_user_role(7, 'staff', 2)
         self.assertEqual(mock_user.role, UserRole.staff)
         self.assertEqual(mock_user.creator_id, 2)
         mock_query.get.assert_called_once_with(7)
@@ -355,7 +358,7 @@ class TestRoutesIntegration(EventHubTestCase):
                 flashes = session.get('_flashes', [])
                 if not any('Tạo sự kiện thành công!' in flash[1] for flash in flashes):
                     from eventapp.routes import CreateEventForm
-                    form = CreateEventForm(formdata=request.form)
+                    form = CreateEventForm(formdata=flask.request.form)
                     print(f"Session contents: {session}")
                     print(f"Flash messages: {flashes}")
                     print(f"Form errors: {form.errors}")
@@ -400,7 +403,7 @@ class TestRoutesIntegration(EventHubTestCase):
                 flashes = session.get('_flashes', [])
                 if not any('Cập nhật sự kiện thành công!' in flash[1] for flash in flashes):
                     from eventapp.routes import UpdateEventForm
-                    form = UpdateEventForm(formdata=request.form)
+                    form = UpdateEventForm(formdata=flask.request.form)
                     print(f"Session contents: {session}")
                     print(f"Flash messages: {flashes}")
                     print(f"Form errors: {form.errors}")
