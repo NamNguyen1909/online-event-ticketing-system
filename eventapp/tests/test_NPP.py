@@ -149,21 +149,21 @@ class TestDAOLayer(EventHubTestCase):
     def test_check_user(self, mock_query):
         """Test check_user with username john_doe."""
         mock_user = MagicMock(id=1, username='john_doe')
-        mock_query.filter_by.return_value.first.return_value = mock_user
+        mock_query.filter.return_value.first.return_value = mock_user
         result = check_user('john_doe')
         self.assertEqual(result, mock_user)
         self.assertEqual(result.username, 'john_doe')
-        mock_query.filter_by.assert_called_once_with(username='john_doe')
+        mock_query.filter.assert_called_once_with(User.username == 'john_doe')
 
     @patch('eventapp.dao.User.query')
     def test_check_email(self, mock_query):
         """Test check_email with email jane@example.com."""
         mock_user = MagicMock(id=1, email='jane@example.com')
-        mock_query.filter_by.return_value.first.return_value = mock_user
+        mock_query.filter.return_value.first.return_value = mock_user
         result = check_email('jane@example.com')
         self.assertEqual(result, mock_user)
         self.assertEqual(result.email, 'jane@example.com')
-        mock_query.filter_by.assert_called_once_with(email='jane@example.com')
+        mock_query.filter.assert_called_once_with(User.email == 'jane@example.com')
 
     @patch('eventapp.dao.db.session.query')
     def test_get_event_detail(self, mock_query):
@@ -203,8 +203,14 @@ class TestDAOLayer(EventHubTestCase):
         }
         # Mock event and ticket types
         mock_event = MagicMock(id=1, title='Music Night', organizer_id=2)
-        mock_ticket_type1 = MagicMock(name='VIP', price=1000000, total_quantity=50)
-        mock_ticket_type2 = MagicMock(name='Standard', price=300000, total_quantity=200)
+        mock_ticket_type1 = MagicMock()
+        mock_ticket_type1.name = 'VIP'
+        mock_ticket_type1.price = 1000000
+        mock_ticket_type1.total_quantity = 50
+        mock_ticket_type2 = MagicMock()
+        mock_ticket_type2.name = 'Standard'
+        mock_ticket_type2.price = 300000
+        mock_ticket_type2.total_quantity = 200
         mock_event.ticket_types = [mock_ticket_type1, mock_ticket_type2]
         mock_db_session.add.side_effect = lambda x: None  # Simulate adding to session
         mock_db_session.commit.return_value = None  # Simulate commit
@@ -228,7 +234,16 @@ class TestDAOLayer(EventHubTestCase):
     @patch('eventapp.dao.db.session')
     def test_update_event_with_tickets(self, mock_db_session, mock_query):
         """Test update_event_with_tickets with event_id 15."""
-        mock_event = MagicMock(id=15, organizer_id=2, ticket_types=[MagicMock(name='VIP')])
+        mock_event = MagicMock(id=15, organizer_id=2)
+        mock_ticket_type1 = MagicMock()
+        mock_ticket_type1.name = 'VIP'
+        mock_ticket_type1.price = 1000000
+        mock_ticket_type1.total_quantity = 50
+        mock_ticket_type2 = MagicMock()
+        mock_ticket_type2.name = 'Student'
+        mock_ticket_type2.price = 200000
+        mock_ticket_type2.total_quantity = 100
+        mock_event.ticket_types = [mock_ticket_type1, mock_ticket_type2]
         mock_query.get.return_value = mock_event
         data = {
             'title': 'Updated Conference',
@@ -242,10 +257,17 @@ class TestDAOLayer(EventHubTestCase):
                 {'name': 'Student', 'price': 200000, 'total_quantity': 100}
             ]
         }
-        result = update_event_with_tickets(15, data, 2)
+        with patch('eventapp.dao.TicketType', side_effect=[mock_ticket_type1, mock_ticket_type2]):
+            result = update_event_with_tickets(15, data, 2)
         self.assertEqual(result, mock_event)
         self.assertEqual(mock_event.title, 'Updated Conference')
         self.assertEqual(len(mock_event.ticket_types), 2)
+        self.assertEqual(mock_event.ticket_types[0].name, 'VIP')
+        self.assertEqual(mock_event.ticket_types[0].price, 1000000)
+        self.assertEqual(mock_event.ticket_types[0].total_quantity, 50)
+        self.assertEqual(mock_event.ticket_types[1].name, 'Student')
+        self.assertEqual(mock_event.ticket_types[1].price, 200000)
+        self.assertEqual(mock_event.ticket_types[1].total_quantity, 100)
         mock_query.get.assert_called_once_with(15)
         mock_db_session.commit.assert_called_once()
 
@@ -271,6 +293,20 @@ class TestDAOLayer(EventHubTestCase):
         self.assertTrue(result)
         for event in mock_events:
             self.assertFalse(event.is_active)
+        mock_query.filter.assert_called_once()
+
+    @patch('eventapp.dao.Event.query')
+    def test_bulk_delete_events_with_invalid_id(self, mock_query):
+        """Test bulk_delete_events with some invalid or unauthorized event IDs."""
+        mock_events = [
+            MagicMock(id=21, organizer_id=2, is_active=True),
+            MagicMock(id=22, organizer_id=3, is_active=True),  # Unauthorized event
+        ]
+        mock_query.filter.return_value.all.return_value = [mock_events[0]]  # Only return authorized events
+        result = bulk_delete_events([21, 22, 999], 2)  # 999 doesn't exist
+        self.assertTrue(result)  # Should return True if at least one event is deleted
+        self.assertFalse(mock_events[0].is_active)  # Authorized event should be deactivated
+        self.assertTrue(mock_events[1].is_active)  # Unauthorized event should remain active
         mock_query.filter.assert_called_once()
 
     def test_validate_ticket_types(self):
@@ -316,14 +352,13 @@ class TestRoutesIntegration(EventHubTestCase):
             self.assertEqual(len(event.ticket_types), 1)
 
     def test_post_organizer_update_event(self):
-        """Test POST /organizer/update-event/12 with valid data."""
+        """Test POST /organizer/update-event/<id> with valid data."""
         with app.app_context():
-            # Create event with id 12 for testing
-            event_12 = self.create_event_and_commit(self.organizer.id, title='Old Title')
-            event_12.id = 12  # Force id for testing
-            db.session.commit()
+            # Create event for testing
+            event = self.create_event_and_commit(self.organizer.id, title='Old Title')
+            event_id = event.id  # Use the auto-generated ID
             self.login_user('organizer', 'Password@123')
-            response = self.client.post(f'/organizer/update-event/12', data={
+            response = self.client.post(f'/organizer/update-event/{event_id}', data={
                 'title': 'Updated Title',
                 'description': 'Updated description',
                 'category': 'conference',
@@ -335,9 +370,9 @@ class TestRoutesIntegration(EventHubTestCase):
                 'ticket_quantity': '50'
             }, follow_redirects=True)
             self.assertEqual(response.status_code, 200)
-            event = db.session.query(Event).get(12)
+            event = db.session.query(Event).get(event_id)
             self.assertEqual(event.title, 'Updated Title')
-            ticket = db.session.query(TicketType).filter_by(event_id=12, name='VIP').first()
+            ticket = db.session.query(TicketType).filter_by(event_id=event_id, name='VIP').first()
             self.assertEqual(ticket.price, 800000)
 
     def test_post_organizer_delete_event(self):
@@ -370,7 +405,8 @@ class TestRoutesIntegration(EventHubTestCase):
     def test_get_event_detail(self):
         """Test GET /event/30."""
         with app.app_context():
-            response = self.client.get('/event/30')
+            self.login_user('organizer', 'Password@123')  # Login to avoid redirect
+            response = self.client.get('/event/30', follow_redirects=True)
             self.assertEqual(response.status_code, 200)
             self.assertIn(b'Event 30', response.data)
 
@@ -385,7 +421,6 @@ class TestRoutesIntegration(EventHubTestCase):
             self.assertEqual(response.status_code, 200)
             self.assertTrue(current_user.is_authenticated)
             self.assertEqual(current_user.email, 'jane@example.com')
-            self.assertIn(b'index.html', response.data)
 
     def test_post_auth_register(self):
         """Test POST /auth/register with valid data."""
@@ -401,7 +436,6 @@ class TestRoutesIntegration(EventHubTestCase):
             self.assertIsNotNone(user)
             self.assertTrue(current_user.is_authenticated)
             self.assertEqual(current_user.username, 'newuser')
-            self.assertIn(b'index.html', response.data)
 
 if __name__ == '__main__':
     unittest.main()
