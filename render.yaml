@@ -3,7 +3,6 @@ databases:
     databaseName: eventhub
     user: eventhub_user
     plan: free
-
 services:
   - type: web
     name: eventhub
