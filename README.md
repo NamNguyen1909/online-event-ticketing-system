@@ -1,4 +1,3 @@
----
 # 🎟️ Online Event Ticketing System (EventHub)
 
 [![Flask](https://img.shields.io/badge/Flask-2.3.x-blue?logo=flask)](https://flask.palletsprojects.com/)
@@ -125,5 +124,4 @@ online-event-ticketing-system/
 - **HwPhuc**: phuc.lehw@gmail.com
 - **FongFus**: npphus@gmail.com
 
----
 **Built with ❤️ for modern event management**
