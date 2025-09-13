@@ -10,10 +10,11 @@ services:
     buildCommand: |
       cd eventapp
       pip install -r requirements.txt
-      ls -l migrations
-      flask db upgrade || { echo "[ERROR] DB upgrade failed"; exit 1; }
+      # flask db stamp head
+      flask db migrate
+      flask db upgrade
       cd ..
-      # python seed.py || { echo "[ERROR] Seed database failed"; exit 1; }
+      python seed.py
     startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT eventapp:app
     envVars:
       - key: DATABASE_URL

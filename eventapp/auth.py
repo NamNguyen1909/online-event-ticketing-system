@@ -33,6 +33,7 @@ def validate_password(password):
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
+    from flask import flash
     if request.method == 'POST':
         try:
             data = request.get_json() if request.is_json else request.form
@@ -41,22 +42,34 @@ def register():
             password = data.get('password')
             phone = data.get('phone')
 
+            logging.info(f"[REGISTER] Nhận dữ liệu: username={username}, email={email}, phone={phone}")
+
             # Kiểm tra dữ liệu đầu vào
             if not all([username, email, password]):
-                return redirect(url_for('auth.register'))
+                logging.warning("[REGISTER] Thiếu thông tin bắt buộc")
+                flash("Vui lòng nhập đầy đủ thông tin bắt buộc.", "danger")
+                return render_template('auth/register.html', username=username, email=email, phone=phone)
 
             if not validate_email(email):
-                return redirect(url_for('auth.register'))
+                logging.warning(f"[REGISTER] Email không hợp lệ: {email}")
+                flash("Email không hợp lệ.", "danger")
+                return render_template('auth/register.html', username=username, email=email, phone=phone)
 
             is_valid_password, password_error = validate_password(password)
             if not is_valid_password:
-                return redirect(url_for('auth.register'))
+                logging.warning(f"[REGISTER] Mật khẩu không hợp lệ: {password_error}")
+                flash(password_error, "danger")
+                return render_template('auth/register.html', username=username, email=email, phone=phone)
 
             # Kiểm tra xem tên người dùng hoặc email đã tồn tại chưa
             if check_user(username):
-                return redirect(url_for('auth.register'))
+                logging.warning(f"[REGISTER] Tên người dùng đã tồn tại: {username}")
+                flash("Tên người dùng đã tồn tại.", "danger")
+                return render_template('auth/register.html', username=username, email=email, phone=phone)
             if check_email(email):
-                return redirect(url_for('auth.register'))
+                logging.warning(f"[REGISTER] Email đã tồn tại: {email}")
+                flash("Email đã tồn tại.", "danger")
+                return render_template('auth/register.html', username=username, email=email, phone=phone)
 
             # Tạo người dùng mới
             password_hash = generate_password_hash(password)
@@ -69,9 +82,12 @@ def register():
             )
             db.session.add(user)
             db.session.commit()
+            logging.info(f"[REGISTER] Đăng ký thành công cho user: {username} ({email})")
 
             # Đăng nhập người dùng sau khi đăng ký thành công
             login_user(user, remember=True)  # Thêm remember=True
+            logging.info(f"[REGISTER] Đăng nhập tự động cho user: {username}")
+            flash("Đăng ký thành công!", "success")
             
             # Redirect về trang được yêu cầu trước đó hoặc trang chủ
             next_page = request.args.get('next')
@@ -79,7 +95,9 @@ def register():
 
         except Exception as e:
             db.session.rollback()
-            return redirect(url_for('auth.register'))
+            logging.error(f"[REGISTER] Lỗi khi đăng ký: {str(e)}")
+            flash("Đã xảy ra lỗi khi đăng ký. Vui lòng thử lại.", "danger")
+            return render_template('auth/register.html', username=username, email=email, phone=phone)
     
     return render_template('auth/register.html')
 
